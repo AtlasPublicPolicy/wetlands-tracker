@@ -30,8 +30,8 @@ else:
     
 # Load external modules
 import glob
-#import pandas as pd
-#from dotenv import load_dotenv
+import pandas as pd
+from dotenv import load_dotenv
 import main_extractor
 import redivis
 

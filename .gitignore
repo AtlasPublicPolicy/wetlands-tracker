@@ -1,3 +1,6 @@
+#redivis upload csvs
+*.csv
+
 # config files
 *.ini
 *.env

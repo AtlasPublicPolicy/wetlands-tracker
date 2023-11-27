@@ -14,7 +14,7 @@ import time
 from tqdm import tqdm
 from datetime import datetime
 import glob
-import tempfile
+#import tempfile
 from IPython.core.interactiveshell import InteractiveShell
 InteractiveShell.ast_node_interactivity = "all"
 
@@ -26,9 +26,9 @@ import pathlib
 import os
 
 #set temp directory
-temp_path = r'tempdir/'
-tempfile.tempdir=temp_path
-assert tempfile.gettempdir() == temp_path
+#temp_path = r'tempdir/'
+#tempfile.tempdir=temp_path
+#assert tempfile.gettempdir() == temp_path
 
 # Run the process that exports to the temp dir
 
