@@ -1,3 +1,4 @@
+import requests
 import pandas as pd
 import numpy as np
 from dotenv import load_dotenv
@@ -613,7 +614,133 @@ def data_schema(df, aws_access_key_id, aws_secret_access_key, redivis_dataset):
             # "validation_df":validation_df
     }
 
+def geocode(dataset):
+    """
+    This function looks for lat/longs that have yet to be geocoded (not just for new new notices but all notices). 
+    It then geocodes them and returns it as a dataframe.
+    """
+    #Load needed tables
+    ## Geocoded Locations
+    table = dataset.table("geocoded_locations:9jz4")
+    geocodedDf = table.to_dataframe(progress=False)
 
+    ## All Locations
+    table = dataset.table("location:xvtg")
+    allDf = table.to_dataframe(progress=False)
+
+    # Find all locations that should be geocoded
+    types = ['latitude', 'longitude']
+    locationMaster = allDf[allDf.type.isin(types)]
+
+    def filterDetail(cell):
+        """
+        This function filters our errors and empty cells. 
+        """
+
+        if 'error' in cell.lower() or cell == '[]' or cell == 'unknown':
+            return False
+        else:
+            return cell
+
+    cleanLocations = [(filterDetail(d), n, t) for (d,n,t) in zip(locationMaster['detail'], locationMaster['noticeID'], locationMaster['type']) if filterDetail(d) != False]
+    cleanLocationsDf = pd.DataFrame(cleanLocations, columns=['detail', 'noticeID', 'type'])
+
+    # Create lat/long pairs for each unique noticeID
+    latLongPairs = []
+    for noticeID in cleanLocationsDf.noticeID.unique():
+        try:
+            tempDF = cleanLocationsDf[cleanLocationsDf.noticeID == noticeID]
+            lat = tempDF[tempDF.type == 'latitude']['detail'].values[0]
+            long = tempDF[tempDF.type == 'longitude']['detail'].values[0]
+            
+            #check if the noticeID has multiple locations
+            latList = lat.split(',')
+            longList = long.split(',')
+
+            for i in range(0, len(latList)):
+                l1 = latList[i].replace('[', '').replace(']', '').replace("'", '').replace('"', '').strip()
+                l2 = longList[i].replace('[', '').replace(']', '').replace("'", '').replace('"', '').strip()
+                try:
+                    l1 = float(l1)
+                    l2 = float(l2)
+                    latLongPairs.append((l1, l2, noticeID))
+                except:
+                    print(f"Error converting lat/long to float: {l1}, {l2}")
+        except:
+            pass
+
+    latLongPairsDf = pd.DataFrame(latLongPairs, columns=['latitude', 'longitude', 'noticeID'])
+
+    # Find all locations that have NOT been geocoded yet
+    notGeocoded = [n for n in latLongPairsDf['noticeID'].unique() if n not in geocodedDf['noticeID'].unique()]
+    print(f"Need to geocode {len(notGeocoded)} locations")
+
+    #Geocode function
+    def geocodeCensus(lat, long, censusYear=2020):
+        """
+        This function takes a location and returns a list with geocoded location data and data appends from Geocod.io.
+        """
+
+        if long > 0:
+            raise Exception(f"Longitude should be negative to be in the continental US. Received {long}.")
+
+        ## Geocod.io (Not great because it tries to map to a street and it's not very accurate for wetlands)
+        #API_KEY = os.environ['GEOCODIO_API_TOKEN']
+        #url = "https://api.geocod.io/v1.7/reverse?api_key="+API_KEY+"&fields=census2010,cd"
+        #params = "&q="+str(lat)+","+str(long)
+
+        #FCC API
+        url = "https://geo.fcc.gov/api/census/area?"
+        latLon = "lat="+str(lat)+"&lon="+str(long)
+        censusYear = f"&censusYear={censusYear}"+"&format=json"
+        response = requests.get(url=url+latLon+censusYear)
+        
+        if response.status_code == 200:
+            try:
+                responseJson = response.json()
+                return (response.status_code, responseJson)
+            except:
+                return (response.status_code, {'results':[]})
+        else:
+            return (response.status_code, {'results':[]})
+
+    geocodedDf = pd.DataFrame([])
+    for n in notGeocoded:
+        resultsDf = []
+        lat = latLongPairsDf[latLongPairsDf['noticeID'] == n]['latitude'].values[0]
+        long = latLongPairsDf[latLongPairsDf['noticeID'] == n]['longitude'].values[0]
+        if long > 0:
+            long = -long
+        #Get 2020 Census Data
+        code, response = geocodeCensus(lat, long, censusYear=2020)
+        if code == 200 and len(response['results']) > 0:
+            results = response['results'][0]
+            if 'bbox' in results:
+                del results['bbox']
+            results['censusYear'] = 2020
+            results['lat'] = lat
+            results['long'] = long
+            resultsDf = pd.DataFrame(results, index=[0])
+            
+
+        #Get 2010 Census Data
+        code, response = geocodeCensus(lat, long, censusYear=2010)
+        if code == 200 and len(response['results']) > 0:
+            results = response['results'][0]
+            if 'bbox' in results:
+                del results['bbox']
+            results['censusYear'] = 2010
+            results['lat'] = lat
+            results['long'] = long
+            resultsDf = pd.concat([resultsDf, pd.DataFrame(results, index=[0])], axis=0)
+        
+        if len(resultsDf) > 0:
+            resultsDf['noticeID'] = n
+            geocodedDf = pd.concat([geocodedDf, resultsDf], axis=0)
+
+        geocodedDf.reset_index(inplace=True, drop=True)
+
+    return geocodedDf
 
 
 def dataframe_to_csv(df, df_name):
@@ -688,6 +815,8 @@ def upload_redivis(tbl_to_upload, redivis_dataset, overwrite_redivis = 0):
                 table = redivis_dataset.table("validation")
             if "aws" in filepath:
                 table = redivis_dataset.table("aws_link")
+            if "geocoded" in filepath:
+                table = redivis_dataset.table("geocoded_locations")
 
             with open(filepath) as file:
                 upload = table.upload(filepath).create(
@@ -702,11 +831,4 @@ def upload_redivis(tbl_to_upload, redivis_dataset, overwrite_redivis = 0):
             print(f"{filepath} was successfully uploaded")
         except Exception as e:
             print(f"Error with uploading {filepath} to {table.name}: {e}")
-
-
-    
-    
-    
-
-
 

@@ -69,13 +69,13 @@ class configuration:
         self.n_days = 20
 
         ## 3) How many maximum notices (sorted by date) to download?
-        self.max_notices = 10
+        self.max_notices = 100
         
         ## 4）which district you would like to scrape: "New Orleans", "Galveston", "Jacksonville", "Mobile", or "all"; default as "all"
         self.district = "all"
 
         ## 5) which table you would like to upload to Redivis?
-        ## Any of tables in the list = ["main", "manager", "character", "mitigation", "location", "fulltext", "summary", "wetland", "embed", "validation", "aws"], "none" or "all"; defaul as "none"
+        ## Any of tables in the list = ["main", "manager", "character", "mitigation", "location", "fulltext", "summary", "wetland", "embed", "validation", "aws", "geocoded"], "none" or "all"; defaul as "none"
         self.tbl_to_upload = "none"
         
         ## 6) For Azure summarization, please set a price cap
@@ -89,6 +89,9 @@ class configuration:
 
         ### 9) Overwrite file with same name on Redivis
         self.overwrite_redivis = 0
+
+        ### 10) Skip paid services including OpenAI and Azure Summaries. 1, skip; 0, do not skip; default = 0
+        self.skipPaid = 1
 
 
 ###############################
@@ -129,31 +132,47 @@ def main(config):
                                            config.redivis_dataset)
 
     ### B. Azure summarization
-    # fulltext_and_summary_tbl = main_extractor.data_schema_summarization(df, 
-    #                                                                     config.price_cap, 
-    #                                                                     config.AZURE_ENDPOINT, 
-    #                                                                     config.AZURE_API_KEY, 
-    #                                                                     config.redivis_dataset,
-    #                                                                     config.n_sentences)
-    # main_tbls.update(fulltext_and_summary_tbl)
+    if config.skipPaid == 0:
+        fulltext_and_summary_tbl = main_extractor.data_schema_summarization(df, 
+                                                                            config.price_cap, 
+                                                                            config.AZURE_ENDPOINT, 
+                                                                            config.AZURE_API_KEY, 
+                                                                            config.redivis_dataset,
+                                                                            config.n_sentences)
+        main_tbls.update(fulltext_and_summary_tbl)
+    else:
+        print("Skipping Azure summaries")
 
     ### C. LLM: wetland impacts 
-    impact_tbl = main_extractor.data_schema_impact(df, 
-                                                   config.OPENAI_API_KEY,
-                                                   config.redivis_dataset)
-    main_tbls.update({"wetland_final_df":impact_tbl["wetland_final_df"]})
+    if config.skipPaid == 0:
+        impact_tbl = main_extractor.data_schema_impact(df, 
+                                                    config.OPENAI_API_KEY,
+                                                    config.redivis_dataset)
+        main_tbls.update({"wetland_final_df":impact_tbl["wetland_final_df"]})
+    else:
+        print("Skipping wetland impacts")
 
     ### D.generate a table for troubleshooting and validation
-    validation_tbl_regex = df.drop(["pdf_trimmed", "tokens"], axis = 1)
-    validation_tbl_llm = impact_tbl["wetland_impact_df"][["noticeID", "wetland_llm_dict"]]
-    validation_df = pd.merge(validation_tbl_regex, validation_tbl_llm, on="noticeID") 
-    main_tbls.update({"validation_df":validation_df})
+    if config.skipPaid == 0:
+        validation_tbl_regex = df.drop(["pdf_trimmed", "tokens"], axis = 1)
+        validation_tbl_llm = impact_tbl["wetland_impact_df"][["noticeID", "wetland_llm_dict"]]
+        validation_df = pd.merge(validation_tbl_regex, validation_tbl_llm, on="noticeID") 
+        main_tbls.update({"validation_df":validation_df})
+    else:
+        print("Skipping validations")
 
     ### E. LLM: embeding and project types
-    embeding_tbl = main_extractor.data_schema_embeding(df, 
-                                                       config.OPENAI_API_KEY,
-                                                       config.redivis_dataset)
-    main_tbls.update(embeding_tbl)
+    if config.skipPaid == 0:
+        embeding_tbl = main_extractor.data_schema_embeding(df, 
+                                                        config.OPENAI_API_KEY,
+                                                        config.redivis_dataset)
+        main_tbls.update(embeding_tbl)
+    else:
+        print("Skipping embedings")
+
+    ### F. Geocoding
+    geocode_tbl = main_extractor.geocode(config.redivis_dataset)
+    main_tbls.update({"geocoded_df": geocode_tbl})
 
     ## Export tables to directory
     [main_extractor.dataframe_to_csv(main_tbls[df_name], df_name) for df_name in main_tbls]
