@@ -16,13 +16,14 @@ from PIL import Image
 
 
 
-def OCR(pdf_url, tesseract_path = "C:/Program Files/Tesseract-OCR/tesseract.exe"):
+def OCR(pdf_url, tesseract_path):
     """
     Convert scanned PDFs to selectable PDFs
     """
     
-    # Specify the Tesseract executable path
-    pytesseract.pytesseract.tesseract_cmd = tesseract_path
+    # Specify the Tesseract executable path if the path is specified
+    if tesseract_path is not None:
+        pytesseract.pytesseract.tesseract_cmd = tesseract_path
     
     # Download the PDF file
     pdf_content = requests.get(pdf_url).content
@@ -41,6 +42,7 @@ def OCR(pdf_url, tesseract_path = "C:/Program Files/Tesseract-OCR/tesseract.exe"
         # Use Tesseract OCR to extract text from the image
         page_text = pytesseract.image_to_string(img)
         page_text = page_text.replace('\n', ' ').replace('\r', '')
+        page_text = re.sub(r'\s{2,}', "", page_text)
         pdf_text += page_text
 
     pdf_document.close()
@@ -67,7 +69,17 @@ def pdf_read(pdf_url, district):
         # Extract text from all pages except appendix in the PDF file
         pdf_full = []
         for p in range(len(pdf_reader.pages)):
-            pdf_p = pdf_reader.pages[p].extract_text().replace("\n", "")
+            pdf_p = pdf_reader.pages[p].extract_text().replace("\n", "").replace("\uf0b7", "")
+            
+            # For pdfs that are scanned
+            if p == 0 and (pdf_p == "" or pdf_p.isspace()):
+                pdf_full = ["ERROR: scanned PDF"]
+                break
+            
+            # For pdfs having attachment only, stop reading
+            if p == 0 and len(re.findall(r'[Pp]\s?[Uu]\s?[Bb]\s?[Ll]\s?[Ii]\s?[Cc]\s?[N]\s?[Oo]\s?[Tt]\s?[Ii]\s?[Cc]\s?[Ee]', pdf_p)) == 0:
+                pdf_full = ["ERROR: no text; attachment only"]
+                break
             
             # Remove the footer for public notices from new_orleans District
             if district == "mvn" and p != 0:
@@ -79,7 +91,7 @@ def pdf_read(pdf_url, district):
                     pdf_header = re.search(r'.*Page \d of \d', pdf_p).group()
                 except:
                     try:
-                        pdf_header = re.search(r'.*?\d{5}\s?-\s?[A-Z]{3}', pdf_p).group()
+                        pdf_header = re.search(r'.*?[\d\s]{5,6}\s?-\s?[A-Z]{3}', pdf_p).group()
                     except:
                         pdf_header = "ERROR"
                 if "ERROR" not in pdf_header:
@@ -101,7 +113,7 @@ def pdf_read(pdf_url, district):
             
             # Remove attachments(pictures) to speed up the reading process
             if district in ["mvn", "sam"]:
-                break_signal = re.findall(r'(E\s?n\s?c\s?l\s?o?\s?s\s?u?\s?r?\s?e?|A\s?t\s?t\s?a\s?c\s?h\s?m\s?e\s?n\s?t|Y\s?o\s?u\s{0,2}a\s?r\s?e\s{0,2}i\s?n\s?v\s?i\s?t\s?e\s?d)', pdf_p)
+                break_signal = re.findall(r'(E\s?n\s?c\s?l\s?o?\s?s\s?u?\s?r?\s?e?|A\s?t\s?t\s?a\s?c\s?h\s?m\s?e\s?n\s?t|Y\s?o\s?u\s?a\s?r\s?e\s?i\s?n\s?v\s?i\s?t\s?e\s?d)', pdf_p)
                 if len(break_signal) != 0:
                     break
             if district == "saj":
@@ -110,12 +122,12 @@ def pdf_read(pdf_url, district):
                     break
 
         pdf_text = "".join(pdf_full)
+        pdf_text = re.sub(r'\s{2,}', "", pdf_text)
         
     except:
-        pdf_text = "ERROR"
+        pdf_text = "ERROR: PDF url is a dead link"
         
-    finally:
-        return pdf_text
+    return pdf_text
     
     
     
@@ -142,15 +154,14 @@ def trim_pdf(pdf_text, district):
     if district == "sam":
         # Trim everyting between "COMMENTS" and "Environmental Protectioin Agency"
         try:
-            trim_tail = re.search(r'C\s?O\s?M\s?M\s?E\s?N\s?T\s?S.*P\s?r\s?o\s?t\s?e\s?c\s?t\s?i\s?o\s?n\s{0,2}A\s?g\s?e\s?n\s?c\s?y', pdf_text).group()
+            trim_tail = re.search(r'C\s?O\s?M\s?M\s?E\s?N\s?T\s?S.*P\s?r\s?o\s?t\s?e\s?c\s?t\s?i\s?o\s?n\s?A\s?g\s?e\s?n\s?c\s?y', pdf_text).group()
         except:
             trim_tail = ""
             
     if district == "saj":
         # Trim everything after "IMPACT ON NATUREAL RESOURCES"
         try:
-            trim_tail = re.search(r'I\s?M\s?P\s?A\s?C\s?T\s{0,2}O\s?N\s{0,2}N\s?A\s?T\s?U\s?R\s?A\s?L\s{0,2}R\s?E\s?S\s?O\s?U\s?R\s?C\s?E\s?S.*', pdf_text).group()
-            # trim_tail = re.search(r'C\s?U\s?L\s?T\s?U\s?R\s?A\s?L\s{0,2}R\s?E\s?S\s?O\s?U\s?R\s?C\s?E\s?S.*', pdf_text).group()
+            trim_tail = re.search(r'I\s?M\s?P\s?A\s?C\s?T\s?O\s?N\s?N\s?A\s?T\s?U\s?R\s?A\s?L\s?R\s?E\s?S\s?O\s?U\s?R\s?C\s?E\s?S.*', pdf_text).group()
         except:
             trim_tail = ""
             
@@ -158,13 +169,12 @@ def trim_pdf(pdf_text, district):
     if district == "swg":
         # Trim everything between "PUBLIC INTEREST REVIEW FACTORS" and "COMMENT PERIOD"
         try:
-            # trim_tail = re.search(r'P\s?U\s?B\s?L\s?I\s?C\s{0,2}I\s?N\s?T\s?E\s?R\s?E\s?S\s?T\s{0,2}R\s?E\s?V\s?I\s?E\s?W\s{0,2}F\s?A\s?C\s?T\s?O\s?R\s?S.*(?=C\s?O\s?M\s?M\s?E\s?N\s?T\s{0,2}P\s?E\s?R\s?I\s?O\s?D\s?:?)', pdf_text).group()
-            trim_tail = re.search(r'C\s?U\s?R\s?R\s?E\s?N\s?T\s{0,2}S\s?I\s?T\s?E\s{0,2}C\s?O\s?N\s?D\s?I\s?T\s?I\s?O\s?N\s?S\s?:?.*(?=C\s?O\s?M\s?M\s?E\s?N\s?T\s{0,2}P\s?E\s?R\s?I\s?O\s?D\s?:?)', pdf_text).group()
+            trim_tail = re.search(r'C\s?U\s?R\s?R\s?E\s?N\s?T\s?S\s?I\s?T\s?E\s?C\s?O\s?N\s?D\s?I\s?T\s?I\s?O\s?N\s?S\s?:?.*(?=C\s?O\s?M\s?M\s?E\s?N\s?T\s?P\s?E\s?R\s?I\s?O\s?D\s?:?)', pdf_text).group()
         except:
             trim_tail = ""
     
     pdf_trimmed = pdf_text.replace(trim_intro, "").replace(trim_tail, "")
-    pdf_trimmed = re.sub(r'\s{2,}', "", pdf_trimmed)
+    # pdf_trimmed = re.sub(r'\s{2,}', "", pdf_trimmed)
     
     # Trim texts when the characters exceed 10,000
     if len(pdf_trimmed) > 5000:
@@ -196,7 +206,7 @@ def get_comment_window(pdf_text, district):
                 comment_window = re.search(r'w\s?i\s?t\s?h\s?i\s?n([\s\d]*)(?=d\s?a\s?y\s?s)', 
                                            pdf_text).group(1).strip().replace(" ", "")
         except:
-            comment_window = "ERROR"
+            comment_window = "ERROR: regex fails"
     else:
         comment_window = "unknown"
         
@@ -222,9 +232,11 @@ def get_pdf_app_num(pdf_text, district):
         if district == "swg":
             permit_application_number = re.search(r'(?<=No:).*?(?=Of)', \
                                       pdf_text).group().replace(" ", "")
+        
+        permit_application_number = re.sub(r'(January|February|March|April|May|June|July|August|September|October|November|December).*', "", permit_application_number)
 
     except:
-        permit_application_number = "ERROR"
+        permit_application_number = "ERROR: regex fails"
         
     finally:
         return permit_application_number
@@ -245,7 +257,7 @@ def get_pdf_manager(pdf_text, district):
             manager_phone = re.search(r'[a-z\.|\d{4,5}](\(?\d{3}\)?-?\d{3}-?\d{4})[^\d]', # \(?\d{3}\)?-?\s{0,3}-?\d{3}\s?-?\s?\d{4}
                                       pdf_text.replace(" ", "")).group(1).strip()            
         except:
-            manager_phone = "ERROR"
+            manager_phone = "ERROR: regex fails"
         
     if district == "sam":
         # Typical formatting: "concerning ..." (xxx)-xxx-xxxx non-numeric characters
@@ -253,7 +265,7 @@ def get_pdf_manager(pdf_text, district):
             manager_phone = re.search(r'c\s?o\s?n\s?c\s?e\s?r\s?n\s?i\s?n\s?g.*?[a-z](\(?\d{3}\)?-?\d{3}-?\d{4})[^\d]',
                                   pdf_text.replace(" ", "")).group(1).strip()            
         except:
-            manager_phone = "ERROR"
+            manager_phone = "ERROR: regex fails"
         
     if district == "saj":
         # Typical formatting: "phone" (xxx)-xxx-xxxx non-numeric characters
@@ -261,16 +273,16 @@ def get_pdf_manager(pdf_text, district):
             manager_phone = re.search(r'p\s?h\s?o\s?n\s?e.*?(\(?\d{3}\)?-?\d{3}-?\d{4})[^\d]',
                                   pdf_text.replace(" ", "")).group(1).strip()            
         except:
-            manager_phone = "ERROR"
+            manager_phone = "ERROR: regex fails"
         
     if district == "swg":
         # Typical formatting: English letter OR "zipcode" (xxx)-xxx-xxxx "Phone"
 
         try:
-            manager_phone = re.search(r'[a-z|\d{4,5}](\(?\d{3}\)?-?\d{3}-?\d{4})\s{0,2}P\s?h\s?o\s?n\s?e',
+            manager_phone = re.search(r'[a-z|\d{4,5}](\(?\d{3}\)?-?\d{3}-?\d{4})\s?P\s?h\s?o\s?n\s?e',
                                       pdf_text.replace(" ", "")).group(1).strip()
         except:
-            manager_phone = "ERROR"
+            manager_phone = "ERROR: regex fails"
         
         
 
@@ -284,7 +296,7 @@ def get_pdf_manager(pdf_text, district):
             if "ElizabethHill" in manager_email:
                 manager_email = re.sub(r'.*ElizabethHill', "", manager_email)
         except:
-            manager_email = "ERROR"
+            manager_email = "ERROR: regex fails"
     
     if district == "sam":
         # Typical formatting: xxx.xxx.xxx@usace.army.mil OR xxx-xxx-xxx@usace.army.mil
@@ -295,7 +307,7 @@ def get_pdf_manager(pdf_text, district):
                 manager_email = re.sub(r'.*\sat\s', "", manager_email)
             manager_email = manager_email.replace(" ", "")
         except:
-            manager_email = "ERROR"
+            manager_email = "ERROR: regex fails"
             
     if district == "saj":
         # Typical formatting: "QUESTION" OR "question" ... xxx.xxx.xxx@usace.army.mil OR xxx-xxx-xxx@usace.army.mil
@@ -305,7 +317,7 @@ def get_pdf_manager(pdf_text, district):
                 manager_email = re.sub(r'.*\s(at|to)\s', "", manager_email)
             manager_email = manager_email.replace(" ", "")
         except:
-            manager_email = "ERROR" 
+            manager_email = "ERROR: regex fails" 
     
     if district == "swg":
         # Typical formatting: swg_xxx_xxx@usace.army.mil OR SWGxxxxxx@usace.army.mil
@@ -313,7 +325,7 @@ def get_pdf_manager(pdf_text, district):
             manager_email = re.search(r'[Ss]\s?[Ww][A-Za-z\s\d\_]+@\s?u\s?s\s?a\s?c\s?e\s?\.\s?a\s?r\s?m\s?y\s?\.\s?m\s?i\s?l',
                                       pdf_text).group().replace(" ", "")
         except:
-            manager_email = "ERROR"
+            manager_email = "ERROR: regex fails"
         
 
 
@@ -323,38 +335,38 @@ def get_pdf_manager(pdf_text, district):
         
         # Typical formatting: Project Manager(:) xxx (also applied to joint notices which have two project managers)
         try:
-            manager_name = re.search(r'(P\s?r\s?o\s?j\s?e\s?c\s?t\s{0,2}M\s?a\s?n\s?a\s?g\s?e\s?r\s?:?)\s*?(\1|C\s?e\s?r\s?t\s?i\s?f\s?i\s?c\s?a\s?t\s?i\s?o\s?n\s{0,2}A\s?n\s?a\s?l\s?y\s?s\s?t\s?:?)?\s*?([A-Z][a-zA-Z\s\.,]*)(\(|\d|P\s?e\s?r\s?m\s?i\s?t|P\s?r\s?o\s?j\s?e\s?c\s?t|' + manager_email + ')', pdf_text).group(3)
+            manager_name = re.search(r'(P\s?r\s?o\s?j\s?e\s?c\s?t\s?M\s?a\s?n\s?a\s?g\s?e\s?r\s?:?)\s*?(\1|C\s?e\s?r\s?t\s?i\s?f\s?i\s?c\s?a\s?t\s?i\s?o\s?n\s?A\s?n\s?a\s?l\s?y\s?s\s?t\s?:?)?\s*?([A-Z][a-zA-Z\s\.,]*)(\(|\d|P\s?e\s?r\s?m\s?i\s?t|P\s?r\s?o\s?j\s?e\s?c\s?t|' + manager_email + ')', pdf_text).group(3)
             # Clean up the names: replace "Project Manager" and unneccessary spaces
-            manager_name = re.sub(r'P\s?r\s?o\s?j\s?e\s?c\s?t\s{0,2}M\s?a\s?n\s?a\s?g\s?e\s?r\s?:?', "", manager_name).strip()
-            manager_name = re.sub(r'\s{2,}', ", ", manager_name)
+            manager_name = re.sub(r'P\s?r\s?o\s?j\s?e\s?c\s?t\s?M\s?a\s?n\s?a\s?g\s?e\s?r\s?:?', "", manager_name).strip()
+            # manager_name = re.sub(r'\s{2,}', ", ", manager_name)
         
         # When the key phase "Project Manager" is missing, try another format: Branch xxx
         except:
             try:
                 manager_name = re.search(r'B\s?r\s?a\s?n\s?c\s?h([a-zA-Z\s\.]*)(\(|\d|P\s?e\s?r\s?m\s?i\s?t|' + manager_email + ')', pdf_text).group(1).strip()
-                manager_name = re.sub(r'\s{2,}', "", manager_name)
+                # manager_name = re.sub(r'\s{2,}', "", manager_name)
             except:
-                manager_name = "ERROR"
+                manager_name = "ERROR: regex fails"
                 
         # If mistakenly pull "Regulatory" branch name, pull the words after that
         if len(re.findall(r'R\s?e\s?g\s?u\s?l\s?a\s?t\s?o\s?r\s?y', manager_name)) != 0:
             try:
-                manager_name = re.search(r'P\s?r\s?o\s?j\s?e\s?c\s?t\s{0,2}M\s?a\s?n\s?a\s?g\s?e\s?r\s?.*?(B\s?r\s?a\s?n\s?c\s?h|\))\s*?([A-Z][a-zA-Z\s\.]*)', pdf_text).group(2).strip()
-                manager_name = re.sub(r'\s{2,}', "", manager_name)
+                manager_name = re.search(r'P\s?r\s?o\s?j\s?e\s?c\s?t\s?M\s?a\s?n\s?a\s?g\s?e\s?r\s?.*?(B\s?r\s?a\s?n\s?c\s?h|\))\s*?([A-Z][a-zA-Z\s\.]*)', pdf_text).group(2).strip()
+                # manager_name = re.sub(r'\s{2,}', "", manager_name)
             except:
-                manager_name = "ERROR"
+                manager_name = "ERROR: regex fails"
         
         # When the pulled text is too long, other text is mistakenlly pulled; try to pull the words directly before phone number
         if len(manager_name) > 50:
-            if manager_phone != "ERROR":
+            if "ERROR" not in manager_phone:
                 try:
                     manager_phone = re.sub(r'(\(|\))', '', manager_phone)
                     manager_name = re.search(r'[A-Za-z\s\.]*(?=\(' + manager_phone[0:3] + '\))', pdf_text).group().strip()
-                    manager_name = re.sub(r'\s{2,}', "", manager_name)
+                    # manager_name = re.sub(r'\s{2,}', "", manager_name)
                 except:
-                    manager_name = "ERROR"
+                    manager_name = "ERROR: regex fails"
             else:
-                manager_name = "ERROR"
+                manager_name = "ERROR: regex fails; track back to manager_phone"
             
             
             
@@ -362,10 +374,10 @@ def get_pdf_manager(pdf_text, district):
         
         # Typical formatting: the P(p)roject M(m)anager(:) xxx; contact xxx; directed to xxx
         try:
-            manager_name = re.search(r'((t\s?h\s?e|o\s?r)\s{0,2}[Pp]\s?r\s?o\s?j\s?e\s?c\s?t\s{0,2}[Mm]\s?a\s?n\s?a\s?g\s?e\s?r\s?\,?\:?|c\s?o\s?n\s?t\s?a\s?c\s?t|d\s?i\s?r\s?e\s?c\s?t\s?e\s?d\s{0,2}t\s?o)(\s{0,2}[A-Z-].*?)(?=(\,|\,?\so\s?r|\,?\sb\s?y|\,?\sa\s?t|\,?\si\s?n))', pdf_text).group(3).strip()
-            manager_name = re.sub(r'\s{2,}', "", manager_name)
+            manager_name = re.search(r'((t\s?h\s?e|o\s?r)\s?[Pp]\s?r\s?o\s?j\s?e\s?c\s?t\s?[Mm]\s?a\s?n\s?a\s?g\s?e\s?r\s?\,?\:?|c\s?o\s?n\s?t\s?a\s?c\s?t|d\s?i\s?r\s?e\s?c\s?t\s?e\s?d\s?t\s?o)(\s?[A-Z-].*?)(?=(\,|\,?\so\s?r|\,?\sb\s?y|\,?\sa\s?t|\,?\si\s?n))', pdf_text).group(3).strip()
+            # manager_name = re.sub(r'\s{2,}', "", manager_name)
         except:
-            manager_name = "ERROR"
+            manager_name = "ERROR: regex fails"
     
     
 
@@ -373,8 +385,8 @@ def get_pdf_manager(pdf_text, district):
         
         # Typical paragraph formmating: direct(ed) (any written comments) to(via) xxx ... "Copies" OR "copy" OR "For additional ..."
         try:
-            para_manager = re.search(r'd\s?i\s?r\s?e\s?c\s?t\s?e?\s?d?\s{0,2}(any\swritten\scomments)?(\s?t\s?o|v\s?i\s?a).*?(?=C\s?o\s?p\s?i\s?e\s?s|c\s?o\s?p\s?y|F\s?o\s?r\s{0,2}a\s?d\s?d\s?i\s?t\s?i\s?o\s?n\s?a\s?l)', pdf_text).group().strip()
-            para_manager = re.sub(r'\s{2,}', "" ,para_manager)
+            para_manager = re.search(r'd\s?i\s?r\s?e\s?c\s?t\s?e?\s?d?\s?(any\swritten\scomments)?(\s?t\s?o|v\s?i\s?a).*?(?=C\s?o\s?p\s?i\s?e\s?s|c\s?o\s?p\s?y|F\s?o\s?r\s?a\s?d\s?d\s?i\s?t\s?i\s?o\s?n\s?a\s?l)', pdf_text).group().strip()
+            # para_manager = re.sub(r'\s{2,}', "" ,para_manager)
         except:
             para_manager = "ERROR"
             
@@ -382,32 +394,32 @@ def get_pdf_manager(pdf_text, district):
             
             # Typical key phase formmating in pdf_location: "Attention(Attn)(. or :)" OR "P(p)roject M(m)anager(, or :)" OR "contact" xxx "," OR "or" OR "by" OR "at" OR "in" OR "via" OR numbers
             try:
-                manager_name = re.search(r'(A\s?t\s?t\s?e?\s?n\s?t?\s?i?\s?o?\s?n?\s?\.?\:?|[Pp]\s?r\s?o\s?j\s?e\s?c\s?t\s{0,2}[Mm]\s?a\s?n\s?a\s?g\s?e\s?r\s?\,?\:?|c\s?o\s?n\s?t\s?a\s?c\s?t)(.*?)(?=(\,|\so\s?r|\sb\s?y|\sa\s?t|\si\s?n|\d{3,4}))', para_manager).group(2).strip()
+                manager_name = re.search(r'(A\s?t\s?t\s?e?\s?n\s?t?\s?i?\s?o?\s?n?\s?\.?\:?|[Pp]\s?r\s?o\s?j\s?e\s?c\s?t\s?[Mm]\s?a\s?n\s?a\s?g\s?e\s?r\s?\,?\:?|c\s?o\s?n\s?t\s?a\s?c\s?t)(.*?)(?=(\,|\so\s?r|\sb\s?y|\sa\s?t|\si\s?n|\d{3,4}))', para_manager).group(2).strip()
             except:
-                manager_name = "ERROR"
+                manager_name = "ERROR: regex fails"
                 
             # When mistakenlly pulled organization names (branch, division, engineers) or having error:
             if len(re.findall(r'ERROR|[Bb]\s?r\s?a\s?n\s?c\s?h|[Dd]\s?i\s?v\s?i\s?s\s?i\s?o\s?n|[Ee]\s?n\s?g\s?i\s?n\s?e\s?e\s?r\s?s|U\s?S\s?A\s?C\s?E', manager_name)) != 0:
                 
                 #try another formatting in pdf_text: "M(m)anager for this application," OR "the P(p)roject M(m)anager, xxx" OR  "M(m)anager ... Attention(Attn)(, or . or :)" xxx "," OR "or" OR "by" OR "at" OR "in" OR "via" OR numbers OR "("
                 try:
-                    manager_name = re.search(r'([Mm]\s?a\s?n\s?a\s?g\s?e\s?r\s{0,2}f\s?o\s?r\s{0,2}t\s?h\s?i\s?s\s{0,2}a\s?p\s?p\s?l\s?i\s?c\s?a\s?t\s?i\s?o\s?n\,|t\s?h\s?e\s{0,2}[Pp]\s?r\s?o\s?j\s?e\s?c\s?t\s{0,2}[Mm]\s?a\s?n\s?a\s?g\s?e\s?r\s?\,|[Mn]\s?a\s?n\s?a\s?g\s?e\s?r.*?\s?A\s?t\s?t\s?e?\s?n\s?t?\s?i?\s?o?\s?n?\s?\,?\.?\:?)(\s{0,2}[A-Z].*?)(?=(\,|\,?\so\s?r|\,?\sb\s?y|\,?\sa\s?t|\,?\si\s?n|\,?\sv\s?i\s?a|\d{3,4}|\s{0,2}\())', pdf_text).group(2).strip()
+                    manager_name = re.search(r'([Mm]\s?a\s?n\s?a\s?g\s?e\s?r\s?f\s?o\s?r\s?t\s?h\s?i\s?s\s?a\s?p\s?p\s?l\s?i\s?c\s?a\s?t\s?i\s?o\s?n\,|t\s?h\s?e\s?[Pp]\s?r\s?o\s?j\s?e\s?c\s?t\s?[Mm]\s?a\s?n\s?a\s?g\s?e\s?r\s?\,|[Mn]\s?a\s?n\s?a\s?g\s?e\s?r.*?\s?A\s?t\s?t\s?e?\s?n\s?t?\s?i?\s?o?\s?n?\s?\,?\.?\:?)(\s?[A-Z].*?)(?=(\,|\,?\so\s?r|\,?\sb\s?y|\,?\sa\s?t|\,?\si\s?n|\,?\sv\s?i\s?a|\d{3,4}|\s?\())', pdf_text).group(2).strip()
                 except:
-                    manager_name = "ERROR"
+                    manager_name = "ERROR: regex fails"
         else:
-            manager_name = "ERROR"
+            manager_name = "ERROR: regex fails; track back to para_manager"
            
         
         
     if district  == "swg":
         # Typical paragraph formatting: COMMENT PERIOD ... submitted to(:) ... District ...
         try:
-            para_manager = re.search(r'C\s?O\s?M\s?M\s?E\s?N\s?T\s{0,2}P\s?E\s?R\s?I\s?O\s?D.*s\s?u\s?b\s?m\s?i\s?t\s?t\s?e\s?d.*?t\s?o\s?:?(.*?)(?=D\s?I\s?S\s?T\s?R\s?I\s?C\s?T)', pdf_text).group(1).strip()
-            para_manager = re.sub(r'\s{2,}', "" ,para_manager)
+            para_manager = re.search(r'C\s?O\s?M\s?M\s?E\s?N\s?T\s?P\s?E\s?R\s?I\s?O\s?D.*s\s?u\s?b\s?m\s?i\s?t\s?t\s?e\s?d.*?t\s?o\s?:?(.*?)(?=D\s?I\s?S\s?T\s?R\s?I\s?C\s?T)', pdf_text).group(1).strip()
+            # para_manager = re.sub(r'\s{2,}', "" ,para_manager)
         except:
             para_manager = "ERROR"
             
-        if para_manager.find("ERROR") == -1:
+        if para_manager != "ERROR":
             
             # Typical key phase formatting: xxx "U.S." OR "Galveston" OR "Post" OR "PO" OR "P.O." OR numbers OR "S(s)wg_"
             try:
@@ -416,9 +428,9 @@ def get_pdf_manager(pdf_text, district):
                 if manager_name == "":
                     manager_name = "U.S. Army Corps of Engineers"
             except:
-                manager_name = "ERROR"
+                manager_name = "ERROR: regex fails"
         else:
-            manager_name = "ERROR" 
+            manager_name = "ERROR: regex fails; track back to para_manager" 
         
     return {"manager_name":manager_name, 
             "manager_phone":manager_phone, 
@@ -439,18 +451,18 @@ def get_pdf_applicant(pdf_text, district):
             # Applicant full info
             try:
                 pdf_applicant_contents = re.search(r'A\s?[Pp]\s?[Pp]\s?[Ll]\s?[Ii]\s?[Cc]\s?[Aa]\s?[Nn]\s?[Tt]\s?:?(.+)(?=L\s?[Oo]\s?[Cc]\s?[Aa]\s?[Tt]\s?[Ii]\s?[Oo]\s?[Nn])', pdf_text).group(1).strip()
-                pdf_applicant_contents = re.sub(r'\s{2,}', "", pdf_applicant_contents)
+                # pdf_applicant_contents = re.sub(r'\s{2,}', "", pdf_applicant_contents)
 
                 # Extract applicant and contractor when the contractor exists
                 if len(re.findall(r'c\s?\/\s?o', pdf_applicant_contents)) != 0:
                     try:
                         applicant = re.search(r'.+?(?=\,?\s?c\s?\/\s?o)', pdf_applicant_contents).group().strip()
                     except:
-                        applicant = "ERROR"
+                        applicant = "ERROR: regex fails"
                     try:    
                         contractor = re.search(r'c\s?\/\s?o\s?:?\s?(.+?)(?=(,?\s?P\s?o\s?s\s?t|,?\s?P\s?O|,?\s?P\s?\.\s?O\s?\.|,?\s*\d|,?\s?[Aa][tT]{2}))', pdf_applicant_contents).group(1).strip()
                     except:
-                        contractor = "ERROR"
+                        contractor = "ERROR: regex fails"
                         
                  # Extract applicant and contractor when no contractor
                 else:
@@ -458,10 +470,10 @@ def get_pdf_applicant(pdf_text, district):
                     try:
                         applicant = re.search(r'.+?(?=(,?\s?P\s?o\s?s\s?t|,?\s?P\s?O|,?\s?P\s?\.\s?O\s?\.|,?\s*\d|,?\s?[Aa][tT]{2}))', pdf_applicant_contents).group().strip()
                     except:
-                        applicant = "ERROR"
+                        applicant = "ERROR: regex fails"
 
             except:
-                pdf_applicant_contents = applicant = contractor = "ERROR"
+                pdf_applicant_contents = applicant = contractor = "ERROR: regex fails; track back to pdf_applicant_contents"
         else:
             pdf_applicant_contents = applicant = contractor = "unknown"
     
@@ -474,15 +486,15 @@ def get_pdf_applicant(pdf_text, district):
             # Applicant full info
             try:
                 pdf_applicant_contents = re.search(r'A\s?[Pp]\s?[Pp]\s?[Ll]\s?[Ii]\s?[Cc]\s?[Aa]\s?[Nn]\s?[Tt].+(?=(W\s?A\s?T\s?E\s?R\s?W\s?A\s?Y|L\s?O\s?C\s?A\s?T\s?I\s?O\s?N))', pdf_text).group().strip()
-                pdf_applicant_contents = re.sub(r'\s{2,}', "", pdf_applicant_contents)
+                # pdf_applicant_contents = re.sub(r'\s{2,}', "", pdf_applicant_contents)
             except:
-                pdf_applicant_contents = "ERROR"
+                pdf_applicant_contents = "ERROR: regex fails"
                 
             # Applicant
             try:
                 applicant = re.search(r'A\s?[Pp]\s?[Pp]\s?[Ll]\s?[Ii]\s?[Cc]\s?[Aa]\s?[Nn]\s?[Tt]\s?\:?(.+?)(?=(P\s?o\s?s\s?t|P\s?O|P\s?\.\s?O\s?\.|\d|c\/o|A\s?t\s?t\s?n|A\s?t\s?t\s?e\s?n\s?t\s?i\s?o\s?n))', pdf_text).group(1).strip()
             except:
-                applicant = "ERROR"
+                applicant = "ERROR: regex fails"
         else:
             pdf_applicant_contents = applicant = "unknown"
             
@@ -491,7 +503,7 @@ def get_pdf_applicant(pdf_text, district):
             try:
                 contractor = re.search(r'A\s?[Gg]\s?[Ee]\s?[Nn]\s?[Tt]\s?:?(.+?)(?=(P\s?o\s?s\s?t|P\s?O|P\s?\.\s?O\s?\.|\d|c\/o|A\s?t\s?t\s?n|A\s?t\s?t\s?e\s?n\s?t\s?i\s?o\s?n|L\s?O\s?C\s?A\s?T\s?I\s?O\s?N))', pdf_text).group(1).strip()
             except:
-                contractor = "ERROR"
+                contractor = "ERROR: regex fails"
         else:
             contractor = "unknown"
             
@@ -504,17 +516,17 @@ def get_pdf_applicant(pdf_text, district):
             # Applicant full info
             try:
                 pdf_applicant_contents = re.search(r'A\s?[Pp]\s?[Pp]\s?[Ll]\s?[Ii]\s?[Cc]\s?[Aa]\s?[Nn]\s?[Tt].+(?=(W\s?A\s?T\s?E\s?R\s?W\s?A\s?Y|L\s?O\s?C\s?A\s?T\s?I\s?O\s?N))', pdf_text).group().strip()
-                pdf_applicant_contents = re.sub(r'\s{2,}', "", pdf_applicant_contents)
+                # pdf_applicant_contents = re.sub(r'\s{2,}', "", pdf_applicant_contents)
 
                 # Extract applicant; no contractor for Jacksonville                  
                 try:
                     applicant = re.search(r'A\s?[Pp]\s?[Pp]\s?[Ll]\s?[Ii]\s?[Cc]\s?[Aa]\s?[Nn]\s?[Tt]\s?\:?(.+?)(?=(P\s?o\s?s\s?t|P\s?O|P\s?\.\s?O\s?\.|\d|c\/o|A\s?t\s?t\s?n|A\s?t\s?t\s?e\s?n\s?t\s?i\s?o\s?n|$))', pdf_applicant_contents).group(1).strip()
                 except:
-                    applicant = "ERROR"
+                    applicant = "ERROR: regex fails"
                 contractor = "unknown"
 
             except:
-                pdf_applicant_contents = applicant = "ERROR"
+                pdf_applicant_contents = applicant = "ERROR: regex fails; track back to pdf_applicant_contents"
                 contractor = "unknown"
         else:
             pdf_applicant_contents = applicant = contractor = "unknown"
@@ -528,15 +540,15 @@ def get_pdf_applicant(pdf_text, district):
             # Applicant full info
             try:
                 pdf_applicant_contents = re.search(r'A\s?[Pp]\s?[Pp]\s?[Ll]\s?[Ii]\s?[Cc]\s?[Aa]\s?[Nn]\s?[Tt].+(?=(L\s?O\s?C\s?A\s?T\s?I\s?O\s?N|P\s?R\s?O\s?J\s?E\s?C\s?T))', pdf_text).group().strip()
-                pdf_applicant_contents = re.sub(r'\s{2,}', "", pdf_applicant_contents)
+                # pdf_applicant_contents = re.sub(r'\s{2,}', "", pdf_applicant_contents)
             except:
-                pdf_applicant_contents = "ERROR"
+                pdf_applicant_contents = "ERROR: regex fails"
                 
             # Applicant
             try:
                 applicant = re.search(r'A\s?[Pp]\s?[Pp]\s?[Ll]\s?[Ii]\s?[Cc]\s?[Aa]\s?[Nn]\s?[Tt]\s?\:?(.+?)(?=(P\s?o\s?s\s?t|P\s?O|P\s?\.\s?O\s?\.|\d|c\/o|A\s?t\s?t\s?n|A\s?t\s?t\s?e\s?n\s?t\s?i\s?o\s?n))', pdf_text).group(1).strip()
             except:
-                applicant = "ERROR"
+                applicant = "ERROR: regex fails"
         else:
             pdf_applicant_contents = applicant = "unknown"
         
@@ -545,7 +557,7 @@ def get_pdf_applicant(pdf_text, district):
             try:
                 contractor = re.search(r'A\s?[Gg]\s?[Ee]\s?[Nn]\s?[Tt]\s?:?(.+?)(?=(P\s?o\s?s\s?t|P\s?O|P\s?\.\s?O\s?\.|\d|c\/o|A\s?t\s?t\s?n|A\s?t\s?t\s?e\s?n\s?t\s?i\s?o\s?n|L\s?O\s?C\s?A\s?T\s?I\s?O\s?N))', pdf_text).group(1).strip()
             except:
-                contractor = "ERROR"
+                contractor = "ERROR: regex fails"
         else:
             contractor = "unknown"
             
@@ -565,27 +577,27 @@ def get_pdf_location(pdf_text, district):
         
         if district == "mvn":
             try:
-                pdf_location = re.search(r'L\s?[Oo]\s?[Cc]\s?[Aa]\s?[Tt]\s?[Ii]\s?[Oo]\s?[Nn]\s{0,2}[Oo]\s?[Ff]\s{0,2}W\s?[Oo]\s?[Rr]\s?[Kk]\s?:?(.*)(?=C\s?[Hh]\s?[Aa]\s?[Rr]\s?[Aa]\s?[Cc]\s?[Tt]\s?[Ee]\s?[Rr]\s{0,2}[Oo]\s?[Ff]\s{0,2}W\s?[Oo]\s?[Rr]\s?[Kk])', pdf_text).group(1).replace("  ", " ").strip()
+                pdf_location = re.search(r'L\s?[Oo]\s?[Cc]\s?[Aa]\s?[Tt]\s?[Ii]\s?[Oo]\s?[Nn]\s?[Oo]\s?[Ff]\s?W\s?[Oo]\s?[Rr]\s?[Kk]\s?:?(.*?)(?=C\s?[Hh]\s?[Aa]\s?[Rr]\s?[Aa]\s?[Cc]\s?[Tt]\s?[Ee]\s?[Rr]\s?[Oo]\s?[Ff]\s?W\s?[Oo]\s?[Rr]\s?[Kk])', pdf_text).group(1).replace("  ", " ").strip()
             except:
-                pdf_location = "ERROR"
+                pdf_location = "ERROR: regex fails"
                 
         if district  == "sam":
             try:
-                pdf_location = re.search(r'(L\s?O\s?C\s?A\s?T\s?I\s?O\s?N|W\s?A\s?T\s?E\s?R\s?W\s?A\s?Y)\s?:?(.*)(?=(P\s?R\s?O\s?J\s?E\s?C\s?T|P\s?R\s?O\s?P\s?O\s?S\s?E\s?D|A\s?P\s?P\s?L\s?I\s?C\s?A\s?N\s?T|W\s?O\s?R\s?K))', pdf_text).group(2).replace("  ", " ").strip()
+                pdf_location = re.search(r'(L\s?O\s?C\s?A\s?T\s?I\s?O\s?N|W\s?A\s?T\s?E\s?R\s?W\s?A\s?Y)\s?:?(.*?)(?=(P\s?R\s?O\s?J\s?E\s?C\s?T|P\s?R\s?O\s?P\s?O\s?S\s?E\s?D|A\s?P\s?P\s?L\s?I\s?C\s?A\s?N\s?T|W\s?O\s?R\s?K))', pdf_text).group(2).replace("  ", " ").strip()
             except:
-                pdf_location = "ERROR"
+                pdf_location = "ERROR: regex fails"
                 
         if district == "saj":
             try:
-                pdf_location = re.search(r'L\s?O\s?C\s?A\s?T\s?I\s?O\s?N\s?:?(.*)(?=(D\s?i\s?r\s?e\s?c\s?t\s?i\s?o\s?n\s?s|A\s?P\s?P\s?R\s?O\s?X\s?I\s?M\s?A\s?T\s?E|P\s?R\s?O\s?J\s?E\s?C\s?T))', pdf_text).group(1).replace("  ", " ").strip()
+                pdf_location = re.search(r'L\s?O\s?C\s?A\s?T\s?I\s?O\s?N\s?:?(.*?)(?=(D\s?i\s?r\s?e\s?c\s?t\s?i\s?o\s?n\s?s|A\s?P\s?P\s?R\s?O\s?X\s?I\s?M\s?A\s?T\s?E|P\s?R\s?O\s?J\s?E\s?C\s?T))', pdf_text).group(1).replace("  ", " ").strip()
             except:
-                pdf_location = "ERROR"
+                pdf_location = "ERROR: regex fails"
                 
         if district == "swg":
             try:
-                pdf_location = re.search(r'L\s?O\s?C\s?A\s?T\s?I\s?O\s?N\s?:?(.*)(?=(L\s?A\s?T\s?I\s?T\s?U\s?D\s?E|A\s?G\s?E\s?N\s?D\s?A|P\s?R\s?O\s?J\s?E\s?C\s?T|A\s?V\s?O\s?I\s?D\s?A\s?N\s?C\s?E))', pdf_text).group(1).replace("  ", "").strip()
+                pdf_location = re.search(r'L\s?O\s?C\s?A\s?T\s?I\s?O\s?N\s?:?(.*?)(?=(L\s?A\s?T\s?I\s?T\s?U\s?D\s?E|A\s?G\s?E\s?N\s?D\s?A|P\s?R\s?O\s?J\s?E\s?C\s?T|A\s?V\s?O\s?I\s?D\s?A\s?N\s?C\s?E))', pdf_text).group(1).replace("  ", "").strip()
             except:
-                pdf_location = "ERROR"
+                pdf_location = "ERROR: regex fails"
                 
     else:
         pdf_location = "unknown"
@@ -601,34 +613,35 @@ def get_pdf_character(pdf_text, district):
     """
     
     if district == "mvn":
-        if len(re.findall(r'C\s?[Hh]\s?[Aa]\s?[Rr]\s?[Aa]\s?[Cc]\s?[Tt]\s?[Ee]\s?[Rr]\s{0,2}[Oo]\s?[Ff]\s{0,2}W\s?[Oo]\s?[Rr]\s?[Kk]', pdf_text)) != 0:
+        if len(re.findall(r'C\s?[Hh]\s?[Aa]\s?[Rr]\s?[Aa]\s?[Cc]\s?[Tt]\s?[Ee]\s?[Rr]\s?[Oo]\s?[Ff]\s?W\s?[Oo]\s?[Rr]\s?[Kk]|D\s?E\s?S\s?C\s?R\s?I\s?P\s?T\s?I\s?O\s?N', pdf_text)) != 0:
             try:
-                pdf_character = re.search(r'C\s?[Hh]\s?[Aa]\s?[Rr]\s?[Aa]\s?[Cc]\s?[Tt]\s?[Ee]\s?[Rr]\s{0,2}[Oo]\s?[Ff]\s{0,2}W\s?[Oo]\s?[Rr]\s?[Kk](.*?)(?=(M\s?I\s?T\s?I\s?G\s?A\s?T\s?I\s?O\s?N|T\s?h\s?e\s{0,2}c\s?o\s?m\s?m\s?e\s?n\s?t\s{0,2}p\s?e\s?r\s?i\s?o\s?d))', pdf_text).group(1).strip()
-                pdf_character = re.sub(r'\s{2,}', "", pdf_character)
+                pdf_character = re.search(r'(C\s?[Hh]\s?[Aa]\s?[Rr]\s?[Aa]\s?[Cc]\s?[Tt]\s?[Ee]\s?[Rr]\s?[Oo]\s?[Ff]\s?[Ww]\s?[Oo]\s?[Rr]\s?[Kk]|D\s?E\s?S\s?C\s?R\s?I\s?P\s?T\s?I\s?O\s?N)\s?:?(.*?)(?=(M\s?I\s?T\s?I\s?G\s?A\s?T\s?I\s?O\s?N|T\s?h\s?e\s?c\s?o\s?m\s?m\s?e\s?n\s?t\s?p\s?e\s?r\s?i\s?o\s?d))', pdf_text).group(2).strip()
+                # pdf_character = re.sub(r'\s{2,}', "", pdf_character)
             except:
-                pdf_character = "ERROR"
+                pdf_character = "ERROR: regex fails"
         else:
             pdf_character = "unknown"
             
+                          
     if district in ("sam", "saj"):
-        if len(re.findall(r'W\s?O\s?R\s?K', pdf_text)) != 0:
+        if len(re.findall(r'[W\s?O\s?R\s?K|O\s?B\s?J\s?E\s?C\s?T\s?I\s?V\s?E\s?S]', pdf_text)) != 0:
             try:
                 pdf_character = re.search(
-                r'(P\s?R\s?O\s?P\s?O\s?S\s?E\s?D\s{0,2}W\s?O\s?R\s?K|W\s?O\s?R\s?K\s{0,2}D\s?E\s?S\s?C\s?R\s?I\s?P\s?T\s?I\s?O\s?N|W\s?O\s?R\s?K)\s?:?(.*?)(?=(A\s?V\s?O\s?I\s?D\s?A\s?N\s?C\s?E|C\s?O\s?A\s?S\s?T\s?A\s?L|T\s?h\s?e\s{0,2}a\s?p\s?p\s?l\s?i\s?c\s?a\s?n\s?t\s{0,2}h\s?a\s?s\s{0,2}a\s?p\s?p\s?l\s?i\s?e\s?d))',
+                r'(P\s?R\s?O\s?P\s?O\s?S\s?E\s?D\s?W\s?O\s?R\s?K|W\s?O\s?R\s?K\s?D\s?E\s?S\s?C\s?R\s?I\s?P\s?T\s?I\s?O\s?N|W\s?O\s?R\s?K|P\s?R\s?O\s?J\s?E\s?C\s?T\s?G\s?O\s?A\s?L\s?S\s?A\s?N\s?D\s?O\s?B\s?J\s?E\s?C\s?T\s?I\s?V\s?E\s?S)\s?:?(.*?)(?=(A\s?[Vv]\s?[Oo]\s?[Ii]\s?[Dd]\s?[Aa]\s?[Nn]\s?[Cc]\s?[Ee]|[A-Z]{6,}[\s|:]|T\s?h\s?e\s?a\s?p\s?p\s?l\s?i\s?c\s?a\s?n\s?t\s?h\s?a\s?s\s?a\s?p\s?p\s?l\s?i\s?e\s?d))',
                 pdf_text).group(2).strip()
-                pdf_character = re.sub(r'\s{2,}', "", pdf_character)
+                # pdf_character = re.sub(r'\s{2,}', "", pdf_character)
             except:
-                pdf_character = "ERROR"
+                pdf_character = "ERROR: regex fails"
         else:
             pdf_character = "unknown"
+                          
             
     if district == "swg":
-        if len(re.findall(r'P\s?R\s?O\s?J\s?E\s?C\s?T\s{0,2}D\s?E\s?S\s?C\s?R\s?I\s?P\s?T\s?I\s?O\s?N', pdf_text)) != 0:
+        if len(re.findall(r'P?\s?R?\s?O?\s?J?\s?E?\s?C?\s?T?\s?D\s?E\s?S\s?C\s?R\s?I\s?P\s?T\s?I\s?O\s?N', pdf_text)) != 0:
             try:
-                pdf_character = re.search(r'P\s?R\s?O\s?J\s?E\s?C\s?T\s{0,2}D\s?E\s?S\s?C\s?R\s?I\s?P\s?T\s?I\s?O\s?N(.*?)(?=[A-Z\s]+:)', pdf_text).group(1).strip()
-                pdf_character = re.sub(r'\s{2,}', "", pdf_character)
+                pdf_character = re.search(r'P?\s?R?\s?O?\s?J?\s?E?\s?C?\s?T?\s?D\s?E\s?S\s?C\s?R\s?I\s?P\s?T\s?I\s?O\s?N\s?:?(.*?)(?=[A-Z]{6,}[\s|:])', pdf_text).group(1).strip()
             except:
-                pdf_character = "ERROR"
+                pdf_character = "ERROR: regex fails"
         else:
             pdf_character = "unknown"
             
@@ -643,32 +656,32 @@ def get_pdf_mitigation(pdf_text, district):
     """
     
     if district == "mvn":
-        if len(re.findall(r'M\s?I\s?T\s?I\s?G\s?A\s?T\s?I\s?O\s?N', pdf_text)) != 0:
+        if len(re.findall(r'M\s?[Ii]\s?[Ti]\s?[Ii]\s?[Gg]\s?[Aa]\s?[Tt]\s?[Ii]\s?[Oo]\s?[Nn]', pdf_text)) != 0:
             try:
-                pdf_mitigation = re.search(r'M\s?I\s?T\s?I\s?G\s?A\s?T\s?I\s?O\s?N(.*?)(?=T\s?h\s?e\s{0,2}c\s?o\s?m\s?m\s?e\s?n\s?t\s{0,2}p\s?e\s?r\s?i\s?o\s?d)', pdf_text).group(1).strip()
-                pdf_mitigation = re.sub(r'\s{2,}', "", pdf_mitigation)
+                pdf_mitigation = re.search(r'M\s?[Ii]\s?[Ti]\s?[Ii]\s?[Gg]\s?[Aa]\s?[Tt]\s?[Ii]\s?[Oo]\s?[Nn]\s?:?(.*?)(?=T\s?h\s?e\s?c\s?o\s?m\s?m\s?e\s?n\s?t\s?p\s?e\s?r\s?i\s?o\s?d)', pdf_text).group(1).strip()
+                # pdf_mitigation = re.sub(r'\s{2,}', "", pdf_mitigation)
             except:
-                pdf_mitigation = "ERROR"
+                pdf_mitigation = "ERROR: regex fails"
         else:
             pdf_mitigation = "unknown"
     
     if district in ["sam", "saj", "swg"]:
-        if len(re.findall(r'(A\s?V\s?O\s?I\s?D\s?A\s?N\s?C\s?E\s?(&|A\s?N\s?D)\s?M\s?I\s?N\s?I\s?M\s?I\s?Z\s?A\s?T\s?I\s?O\s?N|C?\s?O?\s?M?\s?P?\s?E?\s?N?\s?S?\s?A?\s?T?\s?O?\s?R?\s?Y?\s{0,2}M\s?I\s?T\s?I\s?G\s?A\s?T\s?I\s?O\s?N)', pdf_text)) != 0:
+        if len(re.findall(r'(A\s?V\s?O\s?I\s?D\s?A\s?N\s?C\s?E\s?(&|A\s?N\s?D)\s?M\s?I\s?N\s?I\s?M\s?I\s?Z\s?A\s?T\s?I\s?O\s?N|C?\s?O?\s?M?\s?P?\s?E?\s?N?\s?S?\s?A?\s?T?\s?O?\s?R?\s?Y?\s?M\s?I\s?T\s?I\s?G\s?A\s?T\s?I\s?O\s?N)', pdf_text)) != 0:
                 # pdf_mitigation = re.search(r'(AVOIDANCE|COMPENSATORY|MITIGATION).*?(?=WATER|The applicant will apply|The applicant has applied|CULTURAL)', pdf_text).group().strip()
             try:
-                pdf_avio_mini = re.search(r'M\s?I\s?N\s?I\s?M\s?I\s?Z\s?A\s?T\s?I\s?O\s?N\s{0,2}I?\s?N?\s?F?\s?O?\s?R?\s?M?\s?A?\s?T?\s?I?\s?O?\s?N?.+?(?=[A-Z\s]+:)', pdf_text).group().strip()
+                pdf_avio_mini = re.search(r'M\s?[Ii]\s?[Nn]\s?[Ii]\s?[Mm]\s?[Ii]\s?[Zz]\s?[Aa]\s?[Tt]\s?[Ii]\s?[Oo]\s?[Nn]\s?[Ii]?\s?[Nn]?\s?[Ff]?\s?[Oo]?\s?[Rr]?\s?[Mm]?\s?[Aa]?\s?[Tt]?\s?[Ii]?\s?[Oo]?\s?[Nn]?.+?(?=([A-Z]{6,}[:\s]|T\s?h\s?e\s?a\s?p\s?p\s?l\s?i\s?c\s?a\s?n\s?t\s?w\s?i\s?l\s?l\s?a\s?p\s?p\s?l\s?y))', pdf_text).group().strip()
             except:
-                pdf_avio_mini = "ERROR: AVOIDANCE AND MINIMIZATION"
+                pdf_avio_mini = "ERROR:  regex fails, AVOIDANCE AND MINIMIZATION"
             try:
-                pdf_comp_miti = re.search(r'M\s?I\s?T\s?I\s?G\s?A\s?T\s?I\s?O\s?N.+?(?=[A-Z\s]+:)', 
+                pdf_comp_miti = re.search(r'M\s?I\s?T\s?I\s?G\s?A\s?T\s?I\s?O\s?N.+?(?=([A-Z]{6,}[:\s]|T\s?h\s?e\s?a\s?p\s?p\s?l\s?i\s?c\s?a\s?n\s?t\s?w\s?i\s?l\s?l\s?a\s?p\s?p\s?l\s?y))', 
                                      pdf_text).group().strip()
             except:
-                pdf_comp_miti = "ERROR: COMPENSATORY MITIGATION"
+                pdf_comp_miti = "ERROR:  regex fails, COMPENSATORY MITIGATION"
             if "ERROR" not in pdf_avio_mini and "ERROR" not in pdf_comp_miti:
                 pdf_mitigation = pdf_avio_mini + " " + pdf_comp_miti
-                pdf_mitigation = re.sub(r'\s{2,}', "", pdf_mitigation)
+                # pdf_mitigation = re.sub(r'\s{2,}', "", pdf_mitigation)
             else:
-                pdf_mitigation = "ERROR"
+                pdf_mitigation = "ERROR: regex fails; track back to pdf_avio_mini or pdf_comp_miti"
         else:
             pdf_mitigation = "unknown"
         
@@ -681,105 +694,98 @@ def get_pdf_mitigation(pdf_text, district):
 
 ## From location of work
 
-# def get_pdf_city_county_parish_MVN_SAM(pdf_text):
-#     """
-#     Get county, city or parish name for New Orleans and Mobile
-#     """
-    
-#     if pdf_text.find("COUNTY") != -1:
-#         try:
-#             county = re.search(r'[\w\s]+C\s?ounty', pdf_text).group().strip()
-#         except Exception as e:
-#             county = "ERROR: " + str(e)
-#         try:
-#             city = re.search(r'[\w\s]+(?=,\s*' + county + ')', pdf_text).group().strip()
-#         except Exception as e:
-#             city = "ERROR: " + str(e)
-#     else:
-#         county = None
-#         city = None
-#     if pdf_text.find("PARISH") != -1:
-#         try:
-#             parish = re.search(r'((?<=(IN|in)).{1,50}PARISH)', pdf_text).group().strip()
-#             #parish = re.search(r'((?<=in).{1,100}(?= Parish))', pdf_text).group().strip()
-#         except Exception as e:
-#             parish = "ERROR: " + str(e)
-#     else:
-#         parish = None
-            
-#     return county, parish, city
-
-
-
-
 def get_pdf_city_county_parish(pdf_location):
     """
     Get county, city, and parish name
     """
     
-    loc_sent_list = re.findall(r'.*?\D\.', pdf_location)
+    # Divide the parapragh into sentenses
+    loc_sent_list = re.split(r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|\?)\s', pdf_location)
     if len(loc_sent_list) == 0:
         loc_sent_list = [pdf_location]
-    
-    county_list = []
+
+    county_list = []    
     city_list = []
-    
+    parish_list = []
+
     for sent in loc_sent_list:
         # if any(x in sent for x in ["Louisiana", "LA", "Alabama", "AL", "Florida", "Fl orida", "FL", "Texas", "TX"]):
         have_county = re.findall(r'[Cc]\s?o\s?u\s?n\s?t\s?y', sent)
-        if len(have_county)!= 0:
-            try:
-                county = re.search(r'(,|\sin)([\w\s]+C\s?ounty)', sent).group(2).strip()
-            except:
-                county = "ERROR"
-            if "ERROR" not in county:
-                try:
-                    city = re.search(r'(in|near)([\w\s]+)(?=,\s*' + county + ')', 
-                                     sent).group(2).strip()
-                except:
-                    city = "ERROR"
-                county = county.replace("in", "").strip()
-                if "ERROR" not in city and len(city) > 25:
-                    city = "Might be ERROR: " + city
-            else:
-                city = "CHECK: fail to pull county"
-        else:
-            county = "unknown"
-            try:
-                city = re.search(
-                    r'(entitled|in|near|of):?([\w\s]+)(?=,?\s?(Louisiana|LA|Alabama|AL|Fl\s?orida|FL|Texas|TX))', 
-                    sent).group(2).strip()
-            except:
-                city = "ERROR"
-            if len(city) > 25:
-                city = "CHECK: " + city
 
-        county_list.append(county)
-        city_list.append(city)
-        
-        if all(county == "unknown" for county in county_list):
-            county = "unknown"
-        elif sum([county == "unknown" for county in county_list]) == 1:
-            county = [county for county in county_list if county == "unknown"][0]
+        # For the sentence mentions "County", pull the xxx County
+        if len(have_county)!= 0:
+            county = re.findall(r'[A-Z][\w\s]+?C\s?o\s?u\s?n\s?t\s?y', sent)
+
+            # Pull the city name, which usually is before county name
+            if len(county) != 0 :    
+                for county_name in county:
+                    try:
+                        city_name = re.search(r'(i\s?n\s?t?\s?h?\s?e?|n\s?e\s?a\s?r|,)\s?([A-Z][\w\s\.]+?)(?=,\s?i?\s?n?\s?' + county_name + ')', 
+                                         sent).group(2).strip()
+                        city_name = re.sub(r'([a-z])([A-Z])', r'\1 \2',  city_name.replace(" ", ""))
+                        if len(city_name) > 25:
+                            city_name = "ERROR: pull the wrong words" + city_name
+                    except:
+                        city_name = "ERROR: no city or regex fails"
+                    city_list.append(city_name)
+
+                    # Remove all unexpacted spaces in county name
+                    county_name = re.sub(r'([a-z])([A-Z])', r'\1 \2', county_name.replace(" ", ""))
+                    county_list.append(county_name)
+
+            # Can detect county but fail to pull anything
+            else:
+                county_name = "ERROR: refex fails"
+                county_list.append(county_name)
+
+        # Cannot detect "County", flag city as to be pulled directly 
         else:
-            county = [county for county in county_list if county != "unknown"]
-            
-        if all("ERROR" in city for city in city_list):
-            city = "unknown"
-        elif sum(["ERROR" not in city for city in city_list]) == 1:
-            city = [city for city in city_list if "ERROR" not in city][0]
+            county_name = "unknown"
+            county_list.append(county_name)
+            city_list.append("Try to pull directly")
+
+        # Pull city names directly instead of using county info
+        if all(any(word in city_name for word in ["ERROR", "directly"]) for city_name in city_list):
+
+            # Might have multiple city names in one sentence
+            city = re.findall(
+                r'(e?\s?n?\s?t\s?i\s?t\s?l\s?e\s?d|i\s?n\s?t?\s?h?\s?e?|n\s?e\s?a\s?r|o\s?f|,)\s?:?\s?([A-Z][\w\s\.]+?)(?=,?\s?(L\s?o\s?u\s?i\s?s\s?i\s?a\s?n\s?a|L\s?A|A\s?l\s?a\s?b\s?a\s?m\s?a|A\s?L|F\s?l\s?o\s?r\s?i\s?d\s?a\s?|F\s?L|T\s?e\s?x\s?a\s?s|T\s?X|a\s?d\s?j\s?a\s?c\s?e\s?n\s?t))', 
+                sent)
+            if len(city) != 0:
+                for city_name in city:
+                    city_name = re.sub(r'([a-z])([A-Z])', r'\1 \2',  city_name[1].replace(" ", "")) # regex group 2
+                    if len(city_name) > 25:
+                        city_name = "ERROR: pull the wrong words" + city_name
+                    city_list.append(city_name)
+            else:
+                city_name = "ERROR: no city or regex fails"
+                city_list.append(city_name)
+
+        # Parish        
+        have_parish = re.findall(r'P\s?a\s?r\s?i\s?s\s?h', sent)
+        if len(have_parish) != 0:
+            parish = re.findall(r'(i\s?n|o\s?f)\s?([A-Z][\w\s\.]+?P\s?a\s?r\s?i\s?s\s?h)', sent)
+            for parish_name in parish:
+                parish_name = re.sub(r'([a-z])([A-Z])', r'\1 \2', parish_name[1].replace(" ", ""))
+                parish_list.append(parish_name)
         else:
-            city = [city for city in city_list if "ERROR" not in city]
-            
-        if "Parish" in sent:
-            try:
-                parish = re.search(r'(?<=in|of).{1,50}Parish', sent).group().strip()
-            except:
-                parish = "ERROR"
-        else:
-            parish = "unknown"
+            parish_name = "unknown"
+            parish_list.append(parish_name)
+
+    # Clean-up
+    county_list = [county for county in set(county_list) if county != "unknown" and "ERROR" not in county]
+    if len(county_list) == 0:
+        county_list = "unknown"
+
+    city_list = [city for city in set(city_list) if any(word in city for word in ["unknown", "ERROR", "directly", "County", "Parish"]) == False]
+    if len(city_list) == 0:
+        city_list = "unknown"
+
+    parish_list = [parish for parish in set(parish_list) if parish != "unknown" and "ERROR" not in parish]
+    if len(parish_list) == 0:
+        parish_list = "unknown"
                     
-    return [county, parish, city]
+    return [county_list, parish_list, city_list]
 
 
 
@@ -788,11 +794,11 @@ def get_pdf_hydrologic(pdf_text):
     """
     Get hydrologic unit code
     """
-    if len(re.findall(r'H\s?y\s?d\s?r\s?o\s?l\s?o\s?g\s?i\s?c\s{0,2}U\s?n\s?i\s?t\s{0,2}C\s?o\s?d\s?e', pdf_text)) != 0:
+    if len(re.findall(r'(H\s?y\s?d\s?r\s?o\s?l\s?o\s?g\s?i\s?c\s?U\s?n\s?i\s?t\s?C\s?o\s?d\s?e|H\s?U\s?C)', pdf_text)) != 0:
         try:
-            hydrologic_unit_code = re.search(r'H\s?y\s?d\s?r\s?o\s?l\s?o\s?g\s?i\s?c\s{0,2}U\s?n\s?i\s?t\s{0,2}C\s?o\s?d\s?e\s?:?\s?([\s\d]*)', pdf_text).group(1).strip().replace(" ", "")
+            hydrologic_unit_code = re.search(r'(H\s?y\s?d\s?r\s?o\s?l\s?o\s?g\s?i\s?c\s?U\s?n\s?i\s?t\s?C\s?o\s?d\s?e|H\s?U\s?C)\s?8?\s?:?\s?([\s\d]*)', pdf_text).group(2).strip().replace(" ", "")
         except:
-            hydrologic_unit_code = "ERROR"
+            hydrologic_unit_code = "ERROR: regex fails"
     else:
         hydrologic_unit_code = "unknown"
     return hydrologic_unit_code
@@ -951,58 +957,6 @@ def get_lon_lat(pdf_text):
 
 
 
-# def get_lon_lat_SAJ_SWG(pdf_text):
-#     """
-#     Get longitude and latitude for Jacksonville and Galveston
-#     """
-    
-#     # Longitude
-#     long_exist = re.findall(r'[Ll]\s?[Oo]\s?[Nn]\s?[Gg]\s?[Ii]\s?[Tt]\s?[Uu]\s?[Dd]\s?[Ee]', pdf_text)
-#     if len(long_exist) != 0:
-#         try:
-#             lon = re.findall(r"[Ll]\s?[Oo]\s?[Nn]\s?[Gg]\s?[Ii]\s?[Tt]\s?[Uu]\s?[Dd]\s?[Ee]\s?:?([\s\-\d\.]{3,})", pdf_text)
-#         except Exception as e:
-#             lon = "ERROR: " + str(e)
-#         if isinstance(lon, str) == False:
-#             if any(i in ["", "1"] for i in lon):
-#                 try:
-#                     lon = re.findall(r'(?<=[-W])(\s*\d{2}\.[\d\s]{3,8})', pdf_text)
-#                 except Exception as e:
-#                     lon = "ERROR: " + str(e)
-#             if isinstance(lon, str) == False:    
-#                 lon = [i.replace(":", "").replace(" ", "") for i in lon]
-#                 lon = [i[1:] if len(i) > 0 and i[0] == "0" else i for i in lon]
-#                 lon = ["-" + i if float(i) > 0 else i for i in lon]
-#     else:
-#         lon = None
-    
-#     # Latitude
-#     lat_exist = re.findall(r'[Ll]\s?a\s?t\s?i?\s?t?\s?u?\s?d?\s?e', pdf_text)    
-#     if len(lat_exist) != 0:
-#         try:
-#             lat = re.findall(r"(?<=Latitude)\s?:?([\s\d\.]+)", pdf_text)
-#         except Exception as e:
-#             lat = "ERROR: " + str(e)
-#         if isinstance(lat, str) == False:
-#             if any(i in [""] for i in lat):
-#                 try:
-#                     lat = re.findall(r'(?<=[^-W°][^-\d°])\d{2}\.[\d\s]{3,8}', pdf_text)
-#                 except Exception as e:
-#                     lat = "ERROR: " + str(e)
-#             if isinstance(lat, str) == False:
-#                 lat = [i.replace(":", "").replace(" ", "") for i in lat]
-#                 lat = [i[1:] if len(i) > 0 and i[0] == "0" else i for i in lat]
-#     else:
-#         lat = None
-    
-#     # Form coordinate
-#     # for i in range(0,len(lon))
-        
-#     return lon, lat
-
-
-
-
 ## From character of work
 
 def acre_type_term(acre_item):
@@ -1018,7 +972,7 @@ def acre_type_term(acre_item):
     try:
         impact_number = re.search(r'[^A-Za-z]+(?=acres?\)?)', acre_item).group()
     except:
-        impact_number = "ERROR"
+        impact_number = "ERROR: regex fails"
     impact_unit = "acre"
 
     # type of impacted areas: wetland;habitat;pond;waterbottom;marsh/water
@@ -1031,7 +985,7 @@ def acre_type_term(acre_item):
                 r'' + impact_number + 'acres?\)?.*?of(\simpacts\sto|.*?in)?(.*?(h\s?a\s?b\s?i\s?t\s?a\s?t|w\s?e\s?t\s?l\s?a\s?n\s?d|p\s?o\s?n\s?d|w\s?a\s?t\s?e\s?r\s?b\s?o\s?t\s?t\s?o\s?m|m\s?a\s?r\s?s\s?h|w\s?a\s?t\s?e\s?r\s?s?))',
                 acre_item).group(2).strip()
         except:
-            impact_type = "ERROR"
+            impact_type = "ERROR: regex fails"
     else:
         impact_type = "project size"
         
@@ -1074,7 +1028,7 @@ def acre_type_term(acre_item):
         try:
             impact_length = re.search(r'(p\s?e\s?r\s?m\s?a\s?n\s?e\s?n\s?t\s?[a-z]*|t\s?e\s?m\s?p\s?o\s?r\s?a\s?r\s?[a-z]*)\)?\s', acre_item).group(0).strip()
         except:
-            impact_length = "ERROR"
+            impact_length = "ERROR: regex fails"
         impact_length_missing = 0
     elif (len(is_negative) != 0 or len(is_positive) != 0) and len(have_length) == 0:
         impact_length = "unknown"
@@ -1105,7 +1059,7 @@ def ft2_type_term(ft2_item):
     try:
         impact_number = re.search(r'[^A-Za-z]+(?=(square|ft2))', ft2_item).group()
     except:
-        impact_number = "ERROR"
+        impact_number = "ERROR: regex fails"
     impact_unit = "square feet"
     
     # type of impacted areas: wetland;habitat;pond;waterbottom;marsh/water
@@ -1117,7 +1071,7 @@ def ft2_type_term(ft2_item):
             impact_type = re.search(
                 r'' + impact_number + '(square)?-?\s?f[eo]*t2?.*?of(\simpacts\sto|.*?in)?(.*?(h\s?a\s?b\s?i\s?t\s?a\s?t|w\s?e\s?t\s?l\s?a\s?n\s?d|p\s?o\s?n\s?d|w\s?a\s?t\s?e\s?r\s?b\s?o\s?t\s?t\s?o\s?m|m\s?a\s?r\s?s\s?h|w\s?a\s?t\s?e\s?r\s?s?))', ft2_item).group(3).strip()
         except:
-            impact_type = "ERROR"
+            impact_type = "ERROR: regex fails"
     else:
         impact_type = "project size"
         
@@ -1160,7 +1114,7 @@ def ft2_type_term(ft2_item):
         try:
             impact_length = re.search(r'(p\s?e\s?r\s?m\s?a\s?n\s?e\s?n\s?t\s?[a-z]*|t\s?e\s?m\s?p\s?o\s?r\s?a\s?r\s?[a-z]*)\)?\s', ft2_item).group(0).strip()
         except:
-            impact_length = "ERROR"
+            impact_length = "ERROR: regex fails"
         impact_length_missing = 0
     elif (len(is_negative) != 0 or len(is_positive) != 0) and len(have_length) == 0:
         impact_length = "unknown"
@@ -1191,7 +1145,7 @@ def lf_type_term(lf_item):
     try:
         impact_number = re.search(r'[^A-Za-z]+(?=linear)', lf_item).group()
     except:
-        impact_number = "ERROR"
+        impact_number = "ERROR: regex fails"
     impact_unit = "linear feet"
     
     # type of impacted areas: stream;shortline;water
@@ -1204,7 +1158,7 @@ def lf_type_term(lf_item):
                 r'' + impact_number + '.*?of(impacts\sto)?(.*?(s\s?t\s?r\s?e\s?a\s?m|s\s?h\s?o\s?r\s?t\s?l\s?i\s?n\s?e|w\s?a\s?t\s?e\s?r))',
                 lf_item).group(2).strip()
         except:
-            impact_type = "ERROR"
+            impact_type = "ERROR: regex fails"
     else:
         impact_type = "project size"
     
@@ -1247,7 +1201,7 @@ def lf_type_term(lf_item):
         try:
             impact_length = re.search(r'(p\s?e\s?r\s?m\s?a\s?n\s?e\s?n\s?t\s?[a-z]*|t\s?e\s?m\s?p\s?o\s?r\s?a\s?r\s?[a-z]*)\)?\s', lf_item).group(0).strip()
         except:
-            impact_length = "ERROR"
+            impact_length = "ERROR: regex fails"
         impact_length_missing = 0
     elif (len(is_negative) != 0 or len(is_positive) != 0) and len(have_length) == 0:
         impact_length = "unknown"
@@ -1342,11 +1296,11 @@ def get_wqc(pdf_text):
     Get the Water Quality Certificant
     """
     
-    if pdf_text.find("WQC") != -1:
+    if "WQC" in pdf_text:
         try:
-            wqc = re.search(r'(?<=WQC)[\d\s\:]*-[\s\d]*', pdf_text).group().strip().replace(" ", "")
+            wqc = re.search(r'W\s?Q\s?C\s?:?#?([\d\s]*-[\s\d]*)', pdf_text).group(1).strip().replace(" ", "")
         except:
-            wqc = "ERROR"
+            wqc = "ERROR: regex fails"
     else:
         wqc = "unknown"
     return wqc
@@ -1364,7 +1318,7 @@ def get_coastal_use_permit(pdf_text):
             coastal_use_permit_list = re.findall(r'P\d{8}', pdf_text)
             coastal_use_permit = ", ".join(coastal_use_permit_list)
         except:
-            coastal_use_permit = "ERROR"
+            coastal_use_permit = "ERROR: regex fails"
     else:
         coastal_use_permit = "unknown"
         
@@ -1375,7 +1329,7 @@ def get_coastal_use_permit(pdf_text):
     
 # FINAL FUNCTION (COMBINED)
 
-def pdf_extraction(pdf_url, tesseract_path = "C:/Program Files/Tesseract-OCR/tesseract.exe"):
+def pdf_extraction(pdf_url, web_text, web_title, tesseract_path=None):
     """
     This function consists of all the components above to extract fields from the public notice pdf.
     """
@@ -1399,18 +1353,35 @@ def pdf_extraction(pdf_url, tesseract_path = "C:/Program Files/Tesseract-OCR/tes
         pdf_dist_code = district.upper()
         pdf_dist_name = district_dic[pdf_dist_code]
         
+        # Pull the PDF texts
         pdf_text = pdf_read(pdf_url, district)
-        if isinstance(pdf_text, str) == False:
-            pdf_text = "ERROR"
-            
-        if len(pdf_text) == 0:
+        pdf_text_flag = "normal"
+                
+        # For the scanned pdf files which are not readable, apply OCR (Optical character recognition)
+        if pdf_text == "ERROR: scanned PDF":
             try:
                 pdf_text = OCR(pdf_url, tesseract_path)
             except:
-                pdf_text = "ERROR"
+                pdf_text = "ERROR: OCR failed"
+            pdf_text_flag = "Scanned PDFs; OCR applied"
+        
+        # For the pdf files only contain attachments, use webpage info
+        if pdf_text == "ERROR: no text; attachment only":
+            pdf_text = web_text
+            pdf_text_flag = "No text in PDF (only attachment); replaced with webpage text"
+            
+        # For the pdf urls that are invalid, use webpage info
+        if pdf_text == "ERROR: PDF url is a dead link":
+            pdf_text = web_text
+            pdf_text_flag = "The PDF url is a dead link; replaced with webpage text"
+            
+        # If both pdf and webpage body are empty
+        if isinstance(pdf_text, str) == False:
+            pdf_text = "ERROR: Replaced with webpage text but no texts in the webpage body"
+            pdf_text_flag = "Replaced with webpage text but no texts in the webpage body"
 
-        # No PDF reader problem
-        if pdf_text != "ERROR": 
+        # If the PDf url is valid and readable
+        if "ERROR" not in pdf_text: 
 
             pdf_trimmed = trim_pdf(pdf_text, district)
 
@@ -1435,7 +1406,7 @@ def pdf_extraction(pdf_url, tesseract_path = "C:/Program Files/Tesseract-OCR/tes
             if pdf_location == "unknown":
                 hydrologic_unit_code = county = city = parish = "unknown"
             elif "ERROR" in pdf_location:
-                hydrologic_unit_code = county = city = parish = "ERROR: cannot extract location of work"
+                hydrologic_unit_code = county = city = parish = "ERROR: cannot extract location of work" + pdf_location
             else:
                 hydrologic_unit_code = get_pdf_hydrologic(pdf_location)
                 county = get_pdf_city_county_parish(pdf_location)[0]
@@ -1453,12 +1424,12 @@ def pdf_extraction(pdf_url, tesseract_path = "C:/Program Files/Tesseract-OCR/tes
                 impact_output = get_pdf_impact(pdf_character)
 
             # Special public notice
-            if any(w in pdf_text for w in ["Special Public Notice", "SPECIAL"]):
+            if len(re.findall(r'[Ss][Pp][Ee][Cc][Ii][Aa][Ll][Pp][Uu][Bb][Ll][Ii][Cc][Nn][Oo][Tt][Ii][Cc][Ee]|G[Ee][Nn][Ee][Rr][Aa][Ll][Pp][Ee][Rr][Mm][Ii][Tt]', pdf_text.replace(" ", ""))) != 0:
                 special = 1
                 if "ERROR" in pdf_app_num:
                     pdf_app_num = "unknown"
             else:
-                if all(item == "unknown" for item in [pdf_applicant["pdf_applicant_contents"], pdf_location, pdf_character, pdf_mitigation]):
+                if all("ERROR" in item or item == "unknown" for item in [pdf_applicant["pdf_applicant_contents"], pdf_location, pdf_character]):
                     special = 1
                     if "ERROR" in pdf_app_num:
                         pdf_app_num = "unknown"
@@ -1467,18 +1438,18 @@ def pdf_extraction(pdf_url, tesseract_path = "C:/Program Files/Tesseract-OCR/tes
      
         # PDF reader problem
         else:
-            special = "ERROR: fail to read pdf"
-            pdf_app_num = pdf_dist_code = pdf_dist_name = "ERROR: fail to read pdf"
-            pdf_manager = {"manager_name":"ERROR: fail to read pdf",
-                           "manager_phone":"ERROR: fail to read pdf",
-                           "manager_email": "ERROR: fail to read pdf"}
-            pdf_applicant = {"pdf_applicant_contents":"ERROR: fail to read pdf",
-                             "applicant":"ERROR: fail to read pdf",
-                             "contractor": "ERROR: fail to read pdf"}
-            comment_window = pdf_location = pdf_character = pdf_mitigation = county = parish = city = hydrologic_unit_code = lon = lat = wqc = cup = "ERROR: fail to read pdf"
-            impact_output = "ERROR: fail to read pdf"
-            pdf_text = "ERROR: fail to read pdf"
-            pdf_trimmed = "ERROR: fail to read pdf"
+            special = "ERROR: no pdf or webpage text found"
+            pdf_app_num = pdf_dist_code = pdf_dist_name = "ERROR: no pdf or webpage text found"
+            pdf_manager = {"manager_name":"ERROR: no pdf or webpage text found",
+                           "manager_phone":"ERROR: no pdf or webpage text found",
+                           "manager_email": "ERROR: no pdf or webpage text found"}
+            pdf_applicant = {"pdf_applicant_contents":"ERROR: no pdf or webpage text found",
+                             "applicant":"ERROR: no pdf or webpage text found",
+                             "contractor": "ERROR: no pdf or webpage text found"}
+            comment_window = pdf_location = pdf_character = pdf_mitigation = county = parish = city = hydrologic_unit_code = lon = lat = wqc = cup = "ERROR: no pdf or webpage text found"
+            impact_output = "ERROR: no pdf or webpage text found"
+            pdf_text = pdf_text
+            pdf_trimmed = "ERROR: no pdf or webpage text found"
     
     # Do not have pdf url
     else:
@@ -1494,9 +1465,15 @@ def pdf_extraction(pdf_url, tesseract_path = "C:/Program Files/Tesseract-OCR/tes
         impact_output = "unknown"
         pdf_text = "unknown"
         pdf_trimmed = "unknown"
+        pdf_text_flag = "PDF url is unknown"
         
-    # print(pdf_app_num)
-        
+    # if applicantion permit number is error, pull from webpage title:
+    if "ERROR" in pdf_app_num or pdf_app_num == "unknown":
+        try:
+            pdf_app_num = re.search(r'[A-Z]{3}[-\s]?\d{4}[-\s]?\d{4,5}[-\s]?\d?[-\s]?[A-Z]{0,3}[\(A-Z\-]*\)?', web_title).group()
+        except:
+            pdf_app_num = "ERROR: cannot pull from webpage title"
+
     return {'specialFlag': special,
             'pdf_comment_window': comment_window,                           
             'usacePermitNumber': pdf_app_num,
@@ -1521,7 +1498,8 @@ def pdf_extraction(pdf_url, tesseract_path = "C:/Program Files/Tesseract-OCR/tes
             'pdf_cup': cup,
             'pdf_impact': impact_output,
             'pdf_full_text': pdf_text,
-            'pdf_trimmed': pdf_trimmed}  
+            'pdf_trimmed': pdf_trimmed,
+             'pdf_text_flag': pdf_text_flag}  
 
 
     
@@ -1612,18 +1590,17 @@ def pdf_to_aws(aws_access_key_id, aws_secret_access_key, web_url, pdf_url, notic
         
         
         
+# TEST FUNCTION: allow pdf_text as input to avoid repetitive pdf reading process      
         
-        
-        
-        
-def pdf_extraction_test(pdf_url, pdf_text):
+def pdf_extraction_test(pdf_url, pdf_text, web_text, web_title, tesseract_path=None):
     """
     This function consists of all the components above to extract fields from the public notice pdf.
     """
-    # print(pdf_url)
+    # track pdf_url for troubleshooting
+    print(pdf_url)
     
     # PDF url exists
-    if len(str(pdf_url)) > 0 and len(re.findall(r'[Pp]\s?[Uu]\s?[Bb]\s?[Ll]\s?[Ii]\s?[Cc]\s{0,2}[N]\s?[Oo]\s?[Tt]\s?[Ii]\s?[Cc]\s?[Ee]', str(pdf_text))) != 0: 
+    if pd.isnull(pdf_url) == False:
         
         # Identify the district
         try:
@@ -1640,18 +1617,38 @@ def pdf_extraction_test(pdf_url, pdf_text):
         pdf_dist_code = district.upper()
         pdf_dist_name = district_dic[pdf_dist_code]
         
+        # Pull the PDF texts
         # pdf_text = pdf_read(pdf_url, district)
-        if isinstance(pdf_text, str) == False:
-            pdf_text = "ERROR"
-            
-        if len(pdf_text) == 0:
+        pdf_text_flag = "normal"
+        
+        # if isinstance(pdf_text, str) == False:
+            # pdf_text = "ERROR"
+                
+        # For the scanned pdf files which are not readable, apply OCR (Optical character recognition)
+        if pdf_text == "ERROR: scanned PDF":
             try:
                 pdf_text = OCR(pdf_url, tesseract_path)
             except:
-                pdf_text = "ERROR"
+                pdf_text = "ERROR: OCR failed"
+            pdf_text_flag = "Scanned PDFs; OCR applied"
+        
+        # For the pdf files only contain attachments, use webpage info
+        if pdf_text == "ERROR: no text; attachment only":
+            pdf_text = web_text
+            pdf_text_flag = "No text in PDF (only attachment); replaced with webpage text"
+            
+        # For the pdf urls that are invalid, use webpage info
+        if pdf_text == "ERROR: PDF url is a dead link":
+            pdf_text = web_text
+            pdf_text_flag = "The PDF url is a dead link; replaced with webpage text"
+            
+        # If both pdf and webpage body are empty
+        if isinstance(pdf_text, str) == False:
+            pdf_text = "ERROR: Replaced with webpage text but no texts in the webpage body"
+            pdf_text_flag = "Replaced with webpage text but no texts in the webpage body"
 
-        # No PDF reader problem
-        if pdf_text != "ERROR": 
+        # If the PDf url is valid and readable
+        if "ERROR" not in pdf_text: 
 
             pdf_trimmed = trim_pdf(pdf_text, district)
 
@@ -1676,7 +1673,7 @@ def pdf_extraction_test(pdf_url, pdf_text):
             if pdf_location == "unknown":
                 hydrologic_unit_code = county = city = parish = "unknown"
             elif "ERROR" in pdf_location:
-                hydrologic_unit_code = county = city = parish = "ERROR: cannot extract location of work"
+                hydrologic_unit_code = county = city = parish = "ERROR: cannot extract location of work" + pdf_location
             else:
                 hydrologic_unit_code = get_pdf_hydrologic(pdf_location)
                 county = get_pdf_city_county_parish(pdf_location)[0]
@@ -1694,12 +1691,12 @@ def pdf_extraction_test(pdf_url, pdf_text):
                 impact_output = get_pdf_impact(pdf_character)
 
             # Special public notice
-            if any(w in pdf_text for w in ["Special Public Notice", "SPECIAL"]):
+            if len(re.findall(r'[Ss][Pp][Ee][Cc][Ii][Aa][Ll][Pp][Uu][Bb][Ll][Ii][Cc][Nn][Oo][Tt][Ii][Cc][Ee]|G[Ee][Nn][Ee][Rr][Aa][Ll][Pp][Ee][Rr][Mm][Ii][Tt]', pdf_text.replace(" ", ""))) != 0:
                 special = 1
                 if "ERROR" in pdf_app_num:
                     pdf_app_num = "unknown"
             else:
-                if all(item == "unknown" for item in [pdf_applicant["pdf_applicant_contents"], pdf_location, pdf_character, pdf_mitigation]):
+                if all("ERROR" in item or item == "unknown" for item in [pdf_applicant["pdf_applicant_contents"], pdf_location, pdf_character]):
                     special = 1
                     if "ERROR" in pdf_app_num:
                         pdf_app_num = "unknown"
@@ -1708,18 +1705,18 @@ def pdf_extraction_test(pdf_url, pdf_text):
      
         # PDF reader problem
         else:
-            special = "ERROR: fail to read pdf"
-            pdf_app_num = pdf_dist_code = pdf_dist_name = "ERROR: fail to read pdf"
-            pdf_manager = {"manager_name":"ERROR: fail to read pdf",
-                           "manager_phone":"ERROR: fail to read pdf",
-                           "manager_email": "ERROR: fail to read pdf"}
-            pdf_applicant = {"pdf_applicant_contents":"ERROR: fail to read pdf",
-                             "applicant":"ERROR: fail to read pdf",
-                             "contractor": "ERROR: fail to read pdf"}
-            comment_window = pdf_location = pdf_character = pdf_mitigation = county = parish = city = hydrologic_unit_code = lon = lat = wqc = cup = "ERROR: fail to read pdf"
-            impact_output = "ERROR: fail to read pdf"
-            # pdf_text = "ERROR: fail to read pdf"
-            pdf_trimmed = "ERROR: fail to read pdf"
+            special = "ERROR: no pdf or webpage text found"
+            pdf_app_num = pdf_dist_code = pdf_dist_name = "ERROR: no pdf or webpage text found"
+            pdf_manager = {"manager_name":"ERROR: no pdf or webpage text found",
+                           "manager_phone":"ERROR: no pdf or webpage text found",
+                           "manager_email": "ERROR: no pdf or webpage text found"}
+            pdf_applicant = {"pdf_applicant_contents":"ERROR: no pdf or webpage text found",
+                             "applicant":"ERROR: no pdf or webpage text found",
+                             "contractor": "ERROR: no pdf or webpage text found"}
+            comment_window = pdf_location = pdf_character = pdf_mitigation = county = parish = city = hydrologic_unit_code = lon = lat = wqc = cup = "ERROR: no pdf or webpage text found"
+            impact_output = "ERROR: no pdf or webpage text found"
+            pdf_text = pdf_text
+            pdf_trimmed = "ERROR: no pdf or webpage text found"
     
     # Do not have pdf url
     else:
@@ -1733,11 +1730,17 @@ def pdf_extraction_test(pdf_url, pdf_text):
                          "contractor": "unknown"}
         comment_window = pdf_location = pdf_character = pdf_mitigation = county = parish = city = hydrologic_unit_code = lon = lat = wqc = cup = "unknown"
         impact_output = "unknown"
-        # pdf_text = "unknown"
+        pdf_text = "unknown"
         pdf_trimmed = "unknown"
+        pdf_text_flag = "PDF url is unknown"
         
-    # print(pdf_app_num)
-        
+    # if applicantion permit number is error, pull from webpage title:
+    if "ERROR" in pdf_app_num or pdf_app_num == "unknown":
+        try:
+            pdf_app_num = re.search(r'[A-Z]{3}[-\s]?\d{4}[-\s]?\d{4,5}[-\s]?\d?[-\s]?[A-Z]{0,3}[\(A-Z\-]*\)?', web_title).group()
+        except:
+            pdf_app_num = "ERROR: cannot pull from webpage title"
+
     return {'specialFlag': special,
             'pdf_comment_window': comment_window,                           
             'usacePermitNumber': pdf_app_num,
@@ -1761,5 +1764,6 @@ def pdf_extraction_test(pdf_url, pdf_text):
             'pdf_wqc': wqc,
             'pdf_cup': cup,
             'pdf_impact': impact_output,
-            # 'pdf_full_text': pdf_text,
-            'pdf_trimmed': pdf_trimmed}       
+            'pdf_full_text': pdf_text,
+            'pdf_trimmed': pdf_trimmed,
+             'pdf_text_flag': pdf_text_flag}  

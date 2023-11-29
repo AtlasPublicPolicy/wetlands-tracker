@@ -87,11 +87,14 @@ class configuration:
         ## 8) file directory
         self.directory = "data_schema/"
 
-        ### 9) Overwrite file with same name on Redivis
+        ## 9) Overwrite file with same name on Redivis
         self.overwrite_redivis = 0
 
-        ### 10) Skip paid services including OpenAI and Azure Summaries. 1, skip; 0, do not skip; default = 0
+        ## 10) Skip paid services including OpenAI and Azure Summaries. 1, skip; 0, do not skip; default = 0
         self.skipPaid = 1
+
+        ## 11) If you have problem running OCR(Optical Character Recognition), please specify the path for tesseract.exe such as "C:/Program Files/Tesseract-OCR/tesseract.exe".
+        self.tesseract_path = None
 
 
 ###############################
@@ -115,7 +118,8 @@ def main(config):
                                                config.update, 
                                                config.n_days, 
                                                config.max_notices,
-                                               config.district
+                                               config.district,
+                                               config.tesseract_path
                                                )
     # Print the number of notices retrieved
     print(f"Number of notices retrieved: {len(df_base)}")
@@ -153,8 +157,8 @@ def main(config):
     ### C. LLM: wetland impacts 
     if config.skipPaid == 0:
         impact_tbl = main_extractor.data_schema_impact(df, 
-                                                    config.OPENAI_API_KEY,
-                                                    config.redivis_dataset)
+                                                       config.OPENAI_API_KEY,
+                                                       config.redivis_dataset)
         main_tbls.update({"wetland_final_df":impact_tbl["wetland_final_df"]})
     else:
         print("Skipping wetland impacts")
@@ -182,10 +186,10 @@ def main(config):
     main_tbls.update({"geocoded_df": geocode_tbl})
 
     ## Export tables to directory
-    [main_extractor.dataframe_to_csv(main_tbls[df_name], df_name) for df_name in main_tbls]
+    [main_extractor.dataframe_to_csv(main_tbls[df_name], df_name, config.directory) for df_name in main_tbls]
     
     ## Upload to Redivis DB
-    main_extractor.upload_redivis(config.tbl_to_upload, config.redivis_dataset, config.overwrite_redivis)
+    main_extractor.upload_redivis(config.tbl_to_upload, config.redivis_dataset, config.directory, config.overwrite_redivis)
 
 if __name__ == "__main__":
     config = configuration()

@@ -4,7 +4,6 @@ import numpy as np
 from dotenv import load_dotenv
 import io
 import re
-import weblist
 import scrape_rss_webpage
 import scrape_pdf
 import ast
@@ -33,7 +32,7 @@ import os
 
 # Run the process that exports to the temp dir
 
-def restart_or_update(redivis_dataset, update = 1, n_days = 15, max_notices=10, district = "all"):
+def restart_or_update(redivis_dataset, update = 1, n_days = 15, max_notices=10, district = "all", tesseract_path = None):
     """
     Generate the main scraping results
     
@@ -46,7 +45,7 @@ def restart_or_update(redivis_dataset, update = 1, n_days = 15, max_notices=10, 
     
     # First-time scraping: scrape the USACE website to get a list of notice webpage links
     if update == 0:
-        weblist = weblist.get_weblist(district)
+        weblist = scrape_rss_webpage.get_weblist(district)
     
     # Update scraping: scrape the RSS feed to get new notice webpage links
     if update == 1:
@@ -98,7 +97,7 @@ def restart_or_update(redivis_dataset, update = 1, n_days = 15, max_notices=10, 
     # (3) Scrape the PDF of each notice
     
     # Scrape the pdf for each public notice
-    pdf = pd.DataFrame([scrape_pdf.pdf_extraction(x) for x in webpage["PdfUrl"]])
+    pdf = pd.DataFrame([scrape_pdf.pdf_extraction(webpage.loc[x, "PdfUrl"], webpage.loc[x, "web_text"], webpage.loc[x, "web_title"], tesseract_path) for x in webpage.index])
 
     # # Merge with weblist and webpage table
     df_base = webpage.reset_index().join(pdf)
@@ -268,7 +267,7 @@ def data_schema_impact(df, OPENAI_API_KEY, redivis_dataset):
     ### Concatenate all processed batches to form the final DataFrame
     wetland_impact_df = pd.concat(processed_batches, ignore_index=True)
 
-    wetland_impact_df['rowID'] = wetland_impact_df.reset_index().index + 1
+    # wetland_impact_df['rowID'] = wetland_impact_df.reset_index().index + 1
 
     t2 = time.time()
     print('Time taken:', np.round(t2-t1, 3), 'seconds')
@@ -277,12 +276,6 @@ def data_schema_impact(df, OPENAI_API_KEY, redivis_dataset):
     ## B. Break out dictionary to columns
     
     wetland_impact_df2 = dict_to_columns(df_source=wetland_impact_df, dict_col='wetland_llm_dict', index_cols=['noticeID', 'rowID'])
-
-    # Redivis table
-    wetland_impact_df_redivis = redivis_dataset.table("wetland_impact").to_pandas_dataframe(variables = ["rowID"])
-
-    # set row ID
-    wetland_impact_df2['rowID'] = wetland_impact_df2.reset_index().index + wetland_impact_df_redivis.shape[0] + 1
 
     # round 1 - a number (may contain .) and a string , if the string is same as the word in impact_unit, remove string
     # Extracting 'acres', 'sq. feet' etc
@@ -339,6 +332,20 @@ def data_schema_impact(df, OPENAI_API_KEY, redivis_dataset):
 
     wetland_final_df = wetland_impact_df2.rename(columns={'impact_qty_num': 'impact_quantity', 'impact_unit_clean': 'impact_unit'})
 
+    # Replace NAs to 'unknown' except impact_quantity, and remove rows that are unknown for all
+    wetland_final_df = wetland_final_df.replace("", "unknown")
+    wetland_final_df[["wetland_type", "impact_duration", "impact_type", "impact_unit"]] = wetland_final_df[["wetland_type", "impact_duration", "impact_type", "impact_unit"]].fillna('unknown', inplace=False)
+
+    wetland_final_df = wetland_final_df[~((wetland_final_df.wetland_type == "unknown") &
+                (wetland_final_df.impact_duration == "unknown") &
+                (wetland_final_df.impact_type == "unknown") &
+                (wetland_final_df.impact_unit == "unknown") &
+                wetland_final_df.impact_quantity.isna())]
+
+    # Generate row ID
+    wetland_impact_df_redivis = redivis_dataset.table("wetland_impact").to_pandas_dataframe(variables = ["rowID"])
+    wetland_final_df['rowID'] = wetland_final_df.reset_index().index + wetland_impact_df_redivis.shape[0] + 1
+
     del wetland_df
     
     return {"wetland_impact_df": wetland_impact_df, 
@@ -355,6 +362,7 @@ def data_schema_embeding(df, OPENAI_API_KEY, redivis_dataset):
     
     # subset to the work of character and proposed work + count of tokens
     embed_df = df[['noticeID', 'pdf_character', 'tokens']].copy()
+    embed_df = embed_df[embed_df.pdf_character != "unknown"]
     embed_df = embed_df[embed_df.tokens < 4000]
     
     t1 = time.time()
@@ -389,14 +397,16 @@ def data_schema_embeding(df, OPENAI_API_KEY, redivis_dataset):
 
     # Concatenate all processed batches into the final DataFrame
     embed_final_df = pd.concat(processed_batches, ignore_index=True)
-    
-    del embed_df
 
-    # Redivis table
+    # Replace NAs to 'unknown'
+    embed_final_df = embed_final_df.replace("", "unknown")
+    embed_final_df[["pdf_character", "project_detail", "total_project_area", "project_category"]] = embed_final_df[["pdf_character", "project_detail", "total_project_area", "project_category"]].fillna('unknown', inplace=False)
+
+    # Generate row ID
     embed_df_redivis = redivis_dataset.table("embed_project_type").to_pandas_dataframe(variables = ["rowID"])
-
-    # Add 'rowID' column
     embed_final_df['rowID'] = embed_final_df.index + embed_df_redivis.shape[0] + 1
+
+    del embed_df
 
     t2 = time.time()
     print('Time taken:', np.round(t2-t1, 3), 'seconds')
@@ -743,7 +753,7 @@ def geocode(dataset):
     return geocodedDf
 
 
-def dataframe_to_csv(df, df_name):
+def dataframe_to_csv(df, df_name, directory):
     """
     Export dataframes to csv
     """
@@ -755,7 +765,7 @@ def dataframe_to_csv(df, df_name):
     date_str = today.strftime('%Y_%m_%d')
     
     # Create the filename with the specified prefix, year, and date
-    filename = f'data_schema/{str(df_name)}_{date_str}.csv'
+    filename = f'{directory}{str(df_name)}_{date_str}.csv'
     
     # Save the DataFrame to the CSV file
     df.to_csv(filename, index = False)
@@ -765,7 +775,7 @@ def dataframe_to_csv(df, df_name):
 
 
 
-def upload_redivis(tbl_to_upload, redivis_dataset, overwrite_redivis = 0):
+def upload_redivis(tbl_to_upload, redivis_dataset, directory, overwrite_redivis = 0):
     """
     Append the new data to Redivis data tables
     
@@ -781,13 +791,13 @@ def upload_redivis(tbl_to_upload, redivis_dataset, overwrite_redivis = 0):
     
     # Get a list of uploading file pathes
     if tbl_to_upload == "all": 
-        filelist = glob.glob(f"data_schema/*{date_str}.csv")
+        filelist = glob.glob(f"{directory}*{date_str}.csv")
     elif tbl_to_upload == "none":
         filelist = []
     else:
         filelist = []
         for filename in tbl_to_upload:
-            filelist.extend(glob.glob(f"data_schema/{filename}*{date_str}.csv"))
+            filelist.extend(glob.glob(f"{directory}{filename}*{date_str}.csv"))
 
     for filepath in filelist:
 
