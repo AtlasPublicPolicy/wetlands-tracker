@@ -119,6 +119,13 @@ def main(config):
                                                )
     # Print the number of notices retrieved
     print(f"Number of notices retrieved: {len(df_base)}")
+
+
+    # EXPORT RAW_DF AT THIS STAGE - EXCLUDE FULL_TEXT COLUMN
+    raw_df = df_base.drop(columns=['pdf_full_text', 'pdf_trimmed'])
+    raw_df.to_csv('data_schema/raw_df.csv', index=False)
+
+  
     ## Pre-clean
     df = main_extractor.data_schema_preprocess(df_base, 
                                                config.redivis_dataset)
