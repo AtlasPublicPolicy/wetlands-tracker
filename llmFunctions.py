@@ -458,7 +458,7 @@ def dict_to_columns(df_source: pd.DataFrame, dict_col: str, index_cols: list) ->
 # part 4- create embeddings
 @retry(wait=wait_random_exponential(multiplier=1, max=40), stop=stop_after_attempt(3))
 def openai_embed(input_text, API_KEY, embed_type = 'text-embedding-ada-002'):
-
+ try:
     openai.api_key= API_KEY
     encoding = tiktoken.encoding_for_model(embed_type)
     #count number of tokens
@@ -468,5 +468,10 @@ def openai_embed(input_text, API_KEY, embed_type = 'text-embedding-ada-002'):
     embeddings = openai.Embedding.create(input=input_text, engine = embed_type)['data'][0]['embedding']
 
     return token_count, embeddings
+ 
+ except Exception as e:
+        # Return the error message in place of embeddings
+    return token_count, f"Error: {str(e)}"
+
 
 ###############################################################################
