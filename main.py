@@ -4,11 +4,9 @@ import os
 import pkg_resources
 import subprocess
 import logging
+import sys
 
 
-logging.basicConfig(filename='app.log', filemode='w', 
-                    format='%(name)s - %(levelname)s - %(message)s',
-                    level=logging.INFO)
 # PREREQUISITE
 ############################
 
@@ -34,7 +32,7 @@ import pandas as pd
 from dotenv import load_dotenv
 import main_extractor
 import redivis
-
+from error_report import error_report
 
 # Configuration: set up parameters and API keys
 
@@ -66,10 +64,10 @@ class configuration:
         self.update = 1
         
         ## 2）How many days in the past you would like search for updated notices: numeric # from 0 to 500; default as 100
-        self.n_days = 20
+        self.n_days = 14
 
         ## 3) How many maximum notices (sorted by date) to download?
-        self.max_notices = 100
+        self.max_notices = 20
         
         ## 4）which district you would like to scrape: "New Orleans", "Galveston", "Jacksonville", "Mobile", or "all"; default as "all"
         self.district = "all"
@@ -95,6 +93,9 @@ class configuration:
 
         ## 11) If you have problem running OCR(Optical Character Recognition), please specify the path for tesseract.exe such as "C:/Program Files/Tesseract-OCR/tesseract.exe".
         self.tesseract_path = None
+        
+        ## 12) Generate visualization in error report or not? 1, yes; 0, no
+        self.viz = 1
 
 
 ###############################
@@ -109,94 +110,114 @@ class configuration:
 
 def main(config):
     
-    ## Connect to Redivis DB:
-    os.environ['REDIVIS_API_TOKEN'] = config.REDIVIS_API_KEY
+    # Start info/error logging
+    logging.basicConfig(
+        filename='log.txt', 
+        filemode='w', 
+        format='%(name)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S',
+        level=logging.INFO)
+    
+    try:
+        ## Connect to Redivis DB:
+        os.environ['REDIVIS_API_TOKEN'] = config.REDIVIS_API_KEY
 
-    ## If update == 0: scrape all historical notices
-    ## If update == 1: Check latest notices for selected days; For those have not been in Redivis DB, scrape webpage and pdf
-    df_base = main_extractor.restart_or_update(config.redivis_dataset,
-                                               config.update, 
-                                               config.n_days, 
-                                               config.max_notices,
-                                               config.district,
-                                               config.tesseract_path
-                                               )
-    # Print the number of notices retrieved
-    print(f"Number of notices retrieved: {len(df_base)}")
+        ## If update == 0: scrape all historical notices
+        ## If update == 1: Check latest notices for selected days; For those have not been in Redivis DB, scrape webpage and pdf
+        df_base = main_extractor.restart_or_update(config.redivis_dataset,
+                                                   config.update, 
+                                                   config.n_days, 
+                                                   config.max_notices,
+                                                   config.district,
+                                                   config.tesseract_path
+                                                   )
+        # Print the number of notices retrieved
+        print(f"Number of notices retrieved: {len(df_base)}")
 
 
-    # EXPORT RAW_DF AT THIS STAGE - EXCLUDE FULL_TEXT COLUMN
-    raw_df = df_base.drop(columns=['pdf_full_text', 'pdf_trimmed'])
-    raw_df.to_csv('data_schema/raw_df.csv', index=False)
+        # EXPORT RAW_DF AT THIS STAGE - EXCLUDE FULL_TEXT COLUMN
+        raw_df = df_base.drop(columns=['pdf_full_text', 'pdf_trimmed'])
+        raw_df.to_csv(f'{config.directory}raw_df.csv', index=False)
 
-  
-    ## Pre-clean
-    df = main_extractor.data_schema_preprocess(df_base, 
+
+        ## Pre-clean
+        df = main_extractor.data_schema_preprocess(df_base, 
+                                                   config.redivis_dataset)
+
+        ## Clean/Validation
+
+        ### A. main, manager, character of work, mitigation, location, and aws links
+        main_tbls = main_extractor.data_schema(df, 
+                                               config.aws_access_key_id, 
+                                               config.aws_secret_access_key,
                                                config.redivis_dataset)
 
-    ## Clean/Validation
+        ### B. Azure summarization
+        if config.skipPaid == 0:
+            fulltext_and_summary_tbl = main_extractor.data_schema_summarization(df, 
+                                                                                config.price_cap, 
+                                                                                config.AZURE_ENDPOINT, 
+                                                                                config.AZURE_API_KEY, 
+                                                                                config.redivis_dataset,
+                                                                                config.n_sentences)
+            main_tbls.update(fulltext_and_summary_tbl)
+        else:
+            print("Skipping Azure summaries")
 
-    ### A. main, manager, character of work, mitigation, location, and aws links
-    main_tbls = main_extractor.data_schema(df, 
-                                           config.aws_access_key_id, 
-                                           config.aws_secret_access_key,
-                                           config.redivis_dataset)
+        ### C. LLM: wetland impacts 
+        if config.skipPaid == 0:
+            impact_tbl = main_extractor.data_schema_impact(df, 
+                                                           config.OPENAI_API_KEY,
+                                                           config.redivis_dataset)
+            main_tbls.update({"wetland_final_df":impact_tbl["wetland_final_df"]})
+        else:
+            print("Skipping wetland impacts")
 
-    ### B. Azure summarization
-    if config.skipPaid == 0:
-        fulltext_and_summary_tbl = main_extractor.data_schema_summarization(df, 
-                                                                            config.price_cap, 
-                                                                            config.AZURE_ENDPOINT, 
-                                                                            config.AZURE_API_KEY, 
-                                                                            config.redivis_dataset,
-                                                                            config.n_sentences)
-        main_tbls.update(fulltext_and_summary_tbl)
-    else:
-        print("Skipping Azure summaries")
+        ### D.generate a table for troubleshooting and validation
+        if config.skipPaid == 0:
+            validation_tbl_regex = df.drop(["pdf_trimmed", "tokens"], axis = 1)
+            validation_tbl_llm = impact_tbl["wetland_impact_df"][["noticeID", "wetland_llm_dict"]]
+            validation_df = pd.merge(validation_tbl_regex, validation_tbl_llm, on="noticeID") 
+            main_tbls.update({"validation_df":validation_df})
+        else:
+            print("Skipping validations")
 
-    ### C. LLM: wetland impacts 
-    if config.skipPaid == 0:
-        impact_tbl = main_extractor.data_schema_impact(df, 
-                                                       config.OPENAI_API_KEY,
-                                                       config.redivis_dataset)
-        main_tbls.update({"wetland_final_df":impact_tbl["wetland_final_df"]})
-    else:
-        print("Skipping wetland impacts")
+        ### E. LLM: embeding and project types
+        if config.skipPaid == 0:
+            embeding_tbl = main_extractor.data_schema_embeding(df, 
+                                                            config.OPENAI_API_KEY,
+                                                            config.redivis_dataset)
+            main_tbls.update(embeding_tbl)
+        else:
+            print("Skipping embedings")
 
-    ### D.generate a table for troubleshooting and validation
-    if config.skipPaid == 0:
-        validation_tbl_regex = df.drop(["pdf_trimmed", "tokens"], axis = 1)
-        validation_tbl_llm = impact_tbl["wetland_impact_df"][["noticeID", "wetland_llm_dict"]]
-        validation_df = pd.merge(validation_tbl_regex, validation_tbl_llm, on="noticeID") 
-        main_tbls.update({"validation_df":validation_df})
-    else:
-        print("Skipping validations")
+        ### F. Geocoding
+        geocode_tbl = main_extractor.geocode(config.redivis_dataset)
+        main_tbls.update({"geocoded_df": geocode_tbl})
 
-    ### E. LLM: embeding and project types
-    if config.skipPaid == 0:
-        embeding_tbl = main_extractor.data_schema_embeding(df, 
-                                                        config.OPENAI_API_KEY,
-                                                        config.redivis_dataset)
-        main_tbls.update(embeding_tbl)
-    else:
-        print("Skipping embedings")
+        ## Export tables to directory
+        [main_extractor.dataframe_to_csv(main_tbls[df_name], df_name, config.directory) for df_name in main_tbls]
 
-    ### F. Geocoding
-    geocode_tbl = main_extractor.geocode(config.redivis_dataset)
-    main_tbls.update({"geocoded_df": geocode_tbl})
+        ## Upload to Redivis DB
+        main_extractor.upload_redivis(config.tbl_to_upload, config.redivis_dataset, config.directory, config.overwrite_redivis)
+        
+        ## Error report
+        markdown_content = error_report(config.directory, config.viz)
 
-    ## Export tables to directory
-    [main_extractor.dataframe_to_csv(main_tbls[df_name], df_name, config.directory) for df_name in main_tbls]
-    
-    ## Upload to Redivis DB
-    main_extractor.upload_redivis(config.tbl_to_upload, config.redivis_dataset, config.directory, config.overwrite_redivis)
+        with open("error_report.md", "w", encoding="utf-8") as f:
+            f.write(markdown_content)
+            
+        # Construct the path to the Pandoc executable within the virtual environment
+        # pandoc_path = os.path.join(os.path.dirname(__file__), 'venv', 'Lib', 'site-packages', 'pandoc-3.1.9', 'pandoc.exe')
+            
+        # subprocess.run(
+            # [pandoc_path, "error_report.md", "-o", "error_report.pdf"])
+            
+    except Exception as e:
+        logging.error(str(e), exc_info=True)
+        print(str(e))
 
 if __name__ == "__main__":
     config = configuration()
     main(config)
 
-
-## Validation and errors - generate logs.
-
-# error logging
-############
