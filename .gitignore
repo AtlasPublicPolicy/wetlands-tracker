@@ -1,3 +1,8 @@
+#log files
+*.txt
+*.md
+*.png
+
 #redivis upload csvs
 *.csv
 
