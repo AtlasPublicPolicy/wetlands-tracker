@@ -55,7 +55,7 @@ import csv
 from typing import List
 
 import nltk
-nltk.download('punkt')
+#nltk.download('punkt')
 from nltk.tokenize import sent_tokenize
 
 import openai

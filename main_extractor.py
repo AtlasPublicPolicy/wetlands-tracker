@@ -19,7 +19,7 @@ from IPython.core.interactiveshell import InteractiveShell
 InteractiveShell.ast_node_interactivity = "all"
 
 from llmFunctions import getDocumentAbstractiveSummary
-from llmFunctions import sent_regex_extraction
+#from llmFunctions import sent_regex_extraction
 from llmFunctions import openAIfunc_wetland, openAIfunc_project, openai_embed, dict_to_columns
 
 import pathlib
@@ -32,7 +32,7 @@ import os
 
 # Run the process that exports to the temp dir
 
-def restart_or_update(redivis_dataset, update = 1, n_days = 15, max_notices=10, district = "all", tesseract_path = None):
+def restart_or_update(redivis_dataset, update, n_days, max_notices, district = "all", tesseract_path = None):
     """
     Generate the main scraping results
     
@@ -54,6 +54,7 @@ def restart_or_update(redivis_dataset, update = 1, n_days = 15, max_notices=10, 
         
         # ## Set up the reference to Redivis and get as df
         scraped_notices = redivis_dataset.table("main_notices").to_pandas_dataframe(variables = ["noticeID", "usaceWebUrl", "datePublished"])
+        print(f"The number of notices found on Redivis is {len(scraped_notices)}")
         # scraped_notices = pd.read_csv(r'data_schema/main_df_2023_11_20.csv')
         # scraped_notices = scraped_notices[["noticeID", "usaceWebUrl", "datePublished"]]
 
@@ -70,9 +71,11 @@ def restart_or_update(redivis_dataset, update = 1, n_days = 15, max_notices=10, 
 
         # B. Scrape the RSS feed to get the most recent notices
         weblist_ndays = scrape_rss_webpage.update_weblist_from_rss(district, n_days)
+        print(f"The number of notices retreived in date range: {len(weblist_ndays)}.")
 
         # C. Subset the most recent notices to only those that are not in database already
-        scraped_notices_list = [usaceWebUrl[:4] + "s" + usaceWebUrl[4:] for usaceWebUrl in scraped_notices["usaceWebUrl"]]
+        #scraped_notices_list = [usaceWebUrl[:4] + "s" + usaceWebUrl[4:] for usaceWebUrl in scraped_notices["usaceWebUrl"]]  ## this was because of and 's' discrepancy between rss
+        scraped_notices_list = [usaceWebUrl for usaceWebUrl in scraped_notices["usaceWebUrl"]]
         weblist = weblist_ndays[~weblist_ndays["usaceWebUrl"].isin(scraped_notices_list)]
 
         
@@ -84,7 +87,7 @@ def restart_or_update(redivis_dataset, update = 1, n_days = 15, max_notices=10, 
     webpage = weblist.reset_index().join(webpage)
 
     #PRINT NEW NOTICES
-    print('New notices published =', webpage.shape[0])
+    print('Notices published in date range not found in Redivis =', webpage.shape[0])
     
     # sort by date
     webpage = webpage.sort_values(by='datePublished', ascending=False)
@@ -151,8 +154,8 @@ def data_schema_preprocess(df_base, redivis_dataset):
 
     return df
 
-
-
+#Global variable for the 3 Azure/OpenAI functions
+batch_size = 10
 
 def data_schema_summarization(df, price_cap, AZURE_ENDPOINT, AZURE_API_KEY, redivis_dataset, n_sentences = 4):
     """
@@ -175,7 +178,7 @@ def data_schema_summarization(df, price_cap, AZURE_ENDPOINT, AZURE_API_KEY, redi
     summary_df = pd.DataFrame()
 
     # Create the batches
-    batch_size = 2
+    #batch_size = 10
     grouped = [fulltext_df[i:i + batch_size] for i in range(0, fulltext_df.shape[0], batch_size)]
 
     # Calculate characters
@@ -247,7 +250,7 @@ def data_schema_impact(df, OPENAI_API_KEY, redivis_dataset):
     processed_batches = []
 
     ### Create the batches
-    batch_size = 5
+    #batch_size = 10
     grouped = [wetland_df[i:i + batch_size] for i in range(0, wetland_df.shape[0], batch_size)]
 
     ### Process each batch
@@ -275,7 +278,8 @@ def data_schema_impact(df, OPENAI_API_KEY, redivis_dataset):
     
     ## B. Break out dictionary to columns
     
-    wetland_impact_df2 = dict_to_columns(df_source=wetland_impact_df, dict_col='wetland_llm_dict', index_cols=['noticeID', 'rowID'])
+    #wetland_impact_df2 = dict_to_columns(df_source=wetland_impact_df, dict_col='wetland_llm_dict', index_cols=['noticeID', 'rowID'])
+    wetland_impact_df2 = dict_to_columns(df_source=wetland_impact_df, dict_col='wetland_llm_dict', index_cols=['noticeID'])
 
     # round 1 - a number (may contain .) and a string , if the string is same as the word in impact_unit, remove string
     # Extracting 'acres', 'sq. feet' etc
@@ -368,7 +372,7 @@ def data_schema_embeding(df, OPENAI_API_KEY, redivis_dataset):
     t1 = time.time()
 
     # Create the batches
-    batch_size = 30
+    #batch_size = 30
     grouped = [embed_df[i:i + batch_size] for i in range(0, embed_df.shape[0], batch_size)]
 
     # List to collect processed DataFrames

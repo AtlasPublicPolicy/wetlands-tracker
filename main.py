@@ -64,20 +64,20 @@ class configuration:
         self.update = 1
         
         ## 2）How many days in the past you would like search for updated notices: numeric # from 0 to 500; default as 100
-        self.n_days = 14
+        self.n_days = 60
 
         ## 3) How many maximum notices (sorted by date) to download?
-        self.max_notices = 20
+        self.max_notices = 50
         
         ## 4）which district you would like to scrape: "New Orleans", "Galveston", "Jacksonville", "Mobile", or "all"; default as "all"
         self.district = "all"
 
         ## 5) which table you would like to upload to Redivis?
         ## Any of tables in the list = ["main", "manager", "character", "mitigation", "location", "fulltext", "summary", "wetland", "embed", "validation", "aws", "geocoded"], "none" or "all"; defaul as "none"
-        self.tbl_to_upload = "none"
+        self.tbl_to_upload = "all"
         
         ## 6) For Azure summarization, please set a price cap
-        self.price_cap = 5
+        self.price_cap = 25
         
         ## 7) How many sentences you would like to have for summarization
         self.n_sentences = 4
@@ -89,7 +89,7 @@ class configuration:
         self.overwrite_redivis = 0
 
         ## 10) Skip paid services including OpenAI and Azure Summaries. 1, skip; 0, do not skip; default = 0
-        self.skipPaid = 1
+        self.skipPaid = 0
 
         ## 11) If you have problem running OCR(Optical Character Recognition), please specify the path for tesseract.exe such as "C:/Program Files/Tesseract-OCR/tesseract.exe".
         self.tesseract_path = None
