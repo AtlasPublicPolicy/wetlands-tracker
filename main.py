@@ -1,7 +1,7 @@
 # MAIN file
 
 import os
-import pkg_resources
+# import pkg_resources
 import subprocess
 import logging
 import sys
@@ -12,18 +12,18 @@ import sys
 
 # Import requirements.txt
 
-with open('requirements.txt', encoding='utf-8') as f:
-    required_modules = [line.strip() for line in f]
+# with open('requirements.txt', encoding='utf-8') as f:
+#     required_modules = [line.strip() for line in f]
 
-installed_modules = {pkg.key for pkg in pkg_resources.working_set}
-missing_modules = set(required_modules) - installed_modules
+# installed_modules = {pkg.key for pkg in pkg_resources.working_set}
+# missing_modules = set(required_modules) - installed_modules
 
-if missing_modules:
-    print(f"Installing missing modules: {', '.join(missing_modules)}")
-    subprocess.check_call(['pip', 'install'] + list(missing_modules))
-    print("Installation complete.")
-else:
-    print("All required modules are already installed.")
+# if missing_modules:
+#     print(f"Installing missing modules: {', '.join(missing_modules)}")
+#     subprocess.check_call(['pip', 'install'] + list(missing_modules))
+#     print("Installation complete.")
+# else:
+#     print("All required modules are already installed.")
 
     
 # Load external modules
@@ -66,10 +66,10 @@ class configuration:
         self.update = 1
         
         ## 2）How many days in the past you would like search for updated notices: numeric # from 0 to 500; default as 100
-        self.n_days = 60
+        self.n_days = 100
 
         ## 3) How many maximum notices (sorted by date) to download?
-        self.max_notices = 50
+        self.max_notices = 2
         
         ## 4）which district you would like to scrape: "New Orleans", "Galveston", "Jacksonville", "Mobile", or "all"; default as "all"
         self.district = "all"
@@ -88,7 +88,7 @@ class configuration:
         self.directory = "data_schema/"
 
         ## 9) Overwrite file with same name on Redivis
-        self.overwrite_redivis = 0
+        self.overwrite_redivis = 1
 
         ## 10) Skip paid services including OpenAI and Azure Summaries. 1, skip; 0, do not skip; default = 0
         self.skipPaid = 0
@@ -97,7 +97,7 @@ class configuration:
         self.tesseract_path = None
         
         ## 12) Set GPT model
-        self.GPT_MODEL = "gpt-3.5-turbo-0613"
+        self.GPT_MODEL_SET = "gpt-3.5-turbo-0613"
 
 
 ###############################
@@ -145,7 +145,7 @@ def main(config):
         ## Pre-clean
         df = main_extractor.data_schema_preprocess(df_base, 
                                                    config.redivis_dataset,
-                                                   config.GPT_MODEL)
+                                                   config.GPT_MODEL_SET)
 
         ## Clean/Validation
 
@@ -169,7 +169,7 @@ def main(config):
 
         ### C. LLM: wetland impacts 
         if config.skipPaid == 0:
-            impact_tbl = main_extractor.data_schema_impact(df, 
+            impact_tbl = main_extractor.data_schema_impact(df, config.GPT_MODEL_SET,
                                                            config.OPENAI_API_KEY,
                                                            config.redivis_dataset)
             main_tbls.update({"wetland_final_df":impact_tbl["wetland_final_df"]})
@@ -187,7 +187,7 @@ def main(config):
 
         ### E. LLM: embeding and project types
         if config.skipPaid == 0:
-            embeding_tbl = main_extractor.data_schema_embeding(df, 
+            embeding_tbl = main_extractor.data_schema_embedding(df, config.GPT_MODEL_SET,
                                                             config.OPENAI_API_KEY,
                                                             config.redivis_dataset)
             main_tbls.update(embeding_tbl)

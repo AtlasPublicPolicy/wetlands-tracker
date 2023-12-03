@@ -59,6 +59,8 @@ import nltk
 from nltk.tokenize import sent_tokenize
 
 import openai
+from openai import OpenAI
+
 import tiktoken
 import json
 import requests
@@ -171,16 +173,13 @@ def sent_regex_extraction(text: str):
 
 ### step 1 - set up Chat Completion
 
-GPT_MODEL = "gpt-3.5-turbo-0613"
-
-
 @retry(wait=wait_random_exponential(multiplier=1, max=40), stop=stop_after_attempt(3))
-def chat_completion_request(messages, API_KEY, functions=None, function_call=None, model=GPT_MODEL):
+def chat_completion_request(GPT_MODEL, messages, API_KEY, functions=None, function_call=None):
     headers = {
         "Content-Type": "application/json",
         "Authorization": "Bearer " + API_KEY,
     }
-    json_data = {"model": model, "messages": messages, "temperature": 0}
+    json_data = {"model": GPT_MODEL, "messages": messages, "temperature": 0}
     if functions is not None:
         json_data.update({"functions": functions})
     if function_call is not None:
@@ -252,7 +251,7 @@ main_func = [
         ]
 
 
-def openAIfunc_wetland(input_text, API_KEY):
+def openAIfunc_wetland(input_text,  API_KEY, GPT_MODEL):
     
     messages = []
    # messages.append({"role": "system", "content": "Work step by step."})   # POTENTIAL ERROR
@@ -276,7 +275,7 @@ def openAIfunc_wetland(input_text, API_KEY):
                     })
 
 # https://arxiv.org/pdf/2309.03409.pdf
-    chat_response = chat_completion_request(
+    chat_response = chat_completion_request(GPT_MODEL,
         messages, API_KEY, functions=main_func, function_call={"name": "wetland_analysis"}
     )
 
@@ -336,7 +335,7 @@ project_func = [
 ]
 
         
-def openAIfunc_project(input_text, API_KEY):
+def openAIfunc_project(input_text,  API_KEY, GPT_MODEL):
     
     messages = []
    # messages.append({"role": "system", "content": "Work step by step."})   # POTENTIAL ERROR
@@ -394,7 +393,7 @@ retail/service type facilities such as boat retail and/or repair are not conside
                     })
 
 # https://arxiv.org/pdf/2309.03409.pdf
-    chat_response = chat_completion_request(
+    chat_response = chat_completion_request(GPT_MODEL,
         messages, API_KEY,  functions=project_func, function_call={"name": "project_analysis"}
     )
 
@@ -402,7 +401,7 @@ retail/service type facilities such as boat retail and/or repair are not conside
 
     # Convert the stringified JSON to a Python dictionary
     func_response_dict = json.loads(func_response)
-
+    
     # except (KeyError, json.JSONDecodeError) as e:
     # print(f"An error occurred: {e}")
     # func_response_dict = {}
@@ -456,22 +455,38 @@ def dict_to_columns(df_source: pd.DataFrame, dict_col: str, index_cols: list) ->
 ###########################################################################
 
 # part 4- create embeddings
+
+
+# part 4- create embeddings
 @retry(wait=wait_random_exponential(multiplier=1, max=40), stop=stop_after_attempt(3))
-def openai_embed(input_text, API_KEY, embed_type = 'text-embedding-ada-002'):
- try:
-    openai.api_key= API_KEY
-    encoding = tiktoken.encoding_for_model(embed_type)
-    #count number of tokens
-    token_count =  len(encoding.encode(input_text))
+def openai_embed(input_text, API_KEY):
+    # initialize client
+    client = OpenAI(
+    api_key=API_KEY,  
+    )
+    try:
+        openai.api_key= API_KEY
+        encoding = tiktoken.encoding_for_model('text-embedding-ada-002')
+        #count number of tokens
+        token_count =  len(encoding.encode(input_text))
 
-    #generate embeddings  
-    embeddings = openai.Embedding.create(input=input_text, engine = embed_type)['data'][0]['embedding']
+        #generate embeddings  
+        response = client.embeddings.create(input=input_text, model='text-embedding-ada-002')
+        
+        embeddings = response.model_dump_json(indent=0)
+        
+    #     embeddings = embeddings.values[0]
+        
+        # Load the JSON data
+        data = json.loads(embeddings)
 
-    return token_count, embeddings
- 
- except Exception as e:
-        # Return the error message in place of embeddings
-    return token_count, f"Error: {str(e)}"
+        # Access and extract the vector
+        vector = data["data"][0]["embedding"]
+        return token_count, vector
+    
+    except Exception as e:
+            # Return the error message in place of embeddings
+        return token_count, f"Error: {str(e)}"
 
 
 ###############################################################################

@@ -14,7 +14,7 @@ import time
 from tqdm import tqdm
 from datetime import datetime
 import glob
-#import tempfile
+import tempfile
 from IPython.core.interactiveshell import InteractiveShell
 InteractiveShell.ast_node_interactivity = "all"
 
@@ -26,9 +26,9 @@ import pathlib
 import os
 
 #set temp directory
-#temp_path = r'tempdir/'
-#tempfile.tempdir=temp_path
-#assert tempfile.gettempdir() == temp_path
+temp_path = r'tempdir/'
+tempfile.tempdir=temp_path
+assert tempfile.gettempdir() == temp_path
 
 # Run the process that exports to the temp dir
 
@@ -91,6 +91,9 @@ def restart_or_update(redivis_dataset, update, n_days, max_notices, district = "
     #PRINT NEW NOTICES
     print('Notices published in date range not found in Redivis =', webpage.shape[0])
     
+    # if webpage.shape[0] = 0:
+        # print('No new notices to update. Stopping process...")
+        #break
     # sort by date
     webpage = webpage.sort_values(by='datePublished', ascending=False)
 
@@ -228,7 +231,7 @@ def data_schema_summarization(df, price_cap, AZURE_ENDPOINT, AZURE_API_KEY, redi
     
     
         
-def data_schema_impact(df, OPENAI_API_KEY, redivis_dataset):
+def data_schema_impact(df, GPT_MODEL_SET, OPENAI_API_KEY, redivis_dataset):
     """
     Apply LLM to extract the information about the impacts on wetlands
     """
@@ -255,7 +258,7 @@ def data_schema_impact(df, OPENAI_API_KEY, redivis_dataset):
             print(f'Processing batch {i}')
 
             # LLM - wetland impact
-            batch['wetland_llm_dict'] = batch['pdf_character'].apply(lambda x: openAIfunc_wetland(x, API_KEY=OPENAI_API_KEY))
+            batch['wetland_llm_dict'] = batch['pdf_character'].apply(lambda x: openAIfunc_wetland(x, API_KEY=OPENAI_API_KEY, GPT_MODEL=GPT_MODEL_SET))
 
             # Append the processed batch to the list
             processed_batches.append(batch)
@@ -354,7 +357,7 @@ def data_schema_impact(df, OPENAI_API_KEY, redivis_dataset):
 
 
 
-def data_schema_embeding(df, OPENAI_API_KEY, redivis_dataset):
+def data_schema_embedding(df,GPT_MODEL_SET, OPENAI_API_KEY, redivis_dataset):
     """
     Generate the project type and embedding table 
     """
@@ -384,7 +387,7 @@ def data_schema_embeding(df, OPENAI_API_KEY, redivis_dataset):
             embed_columns.columns = ['embed_tokens', 'embeddings']  # Assuming the output is two columns
 
             # Apply the openAIfunc_project function
-            project_llm_dict_series = batch['pdf_character'].apply(lambda x: openAIfunc_project(x, API_KEY=OPENAI_API_KEY))
+            project_llm_dict_series = batch['pdf_character'].apply(lambda x: openAIfunc_project(x, API_KEY=OPENAI_API_KEY,GPT_MODEL=GPT_MODEL_SET))
 
             # Concatenate the new columns to the batch
             batch = pd.concat([batch, project_llm_dict_series.apply(pd.Series), embed_columns], axis=1)
@@ -763,7 +766,7 @@ def dataframe_to_csv(df, df_name, directory):
     
     # Extract date components
     date_str = today.strftime('%Y_%m_%d_%H_%M')
-    
+    # fulltext, validation_df = UTF-8
     # Create the filename with the specified prefix, year, and date
     filename = f'{directory}{str(df_name)}_{date_str}.csv'
     
