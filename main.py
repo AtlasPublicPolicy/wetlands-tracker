@@ -43,10 +43,8 @@ class configuration:
         load_dotenv(r'api_keys.env')
 
         # Azure
-        self.AZURE_ENDPOINT = "https://text-ai-language.cognitiveservices.azure.com/"
-        # os.environ.get('AZURE_ENDPOINT')
-        self.AZURE_API_KEY = "3a31bce0d44349468526ce58651f7675"
-        # os.environ.get('AZURE_API_KEY')
+        self.AZURE_ENDPOINT = os.environ.get('AZURE_ENDPOINT')
+        self.AZURE_API_KEY = os.environ.get('AZURE_API_KEY')
 
         # Redivis
         self.REDIVIS_API_KEY = os.environ.get('REDIVIS_API_KEY')
