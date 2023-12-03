@@ -175,6 +175,26 @@ def sent_regex_extraction(text: str):
 
 @retry(wait=wait_random_exponential(multiplier=1, max=40), stop=stop_after_attempt(3))
 def chat_completion_request(GPT_MODEL, messages, API_KEY, functions=None, function_call=None):
+    """
+    This function makes a POST request to the OpenAI Chat Completion API, sending a JSON payload 
+    that includes the GPT model, a series of messages. It is designed to retry up to three times with 
+    exponential backoff in case of failures. 
+
+    Parameters:
+    GPT_MODEL (str): The identifier of the GPT model to be used for generating responses.
+    messages (list): A list of message dictionaries, where each dictionary represents a single exchange 
+                     within the chat. Each message has a 'role' (either 'user' or 'assistant') and 
+                     'content' (the message text).
+    API_KEY (str): The API key for authentication with the OpenAI API.
+    functions (list, optional): A list of additional functions to be used along with the GPT model. 
+                                Default is None.
+    function_call (dict, optional): A dictionary representing a function call, including function name 
+                                    and parameters. Default is None.
+
+    Returns:
+    requests.models.Response: The response object from the API call if successful.
+    Exception: The exception object if the API call fails.
+    """
     headers = {
         "Content-Type": "application/json",
         "Authorization": "Bearer " + API_KEY,
@@ -460,6 +480,24 @@ def dict_to_columns(df_source: pd.DataFrame, dict_col: str, index_cols: list) ->
 # part 4- create embeddings
 @retry(wait=wait_random_exponential(multiplier=1, max=40), stop=stop_after_attempt(3))
 def openai_embed(input_text, API_KEY):
+    """
+    This function initializes an OpenAI client with the provided API key and then generates embeddings 
+    for the specified input text using the 'text-embedding-ada-002' model. It counts the number of tokens 
+    in the input text, generates embeddings, and extracts the embedding vector from the response.
+
+    Parameters:
+    input_text (str): The text for which embeddings are to be generated.
+    API_KEY (str): The API key for authentication with the OpenAI API.
+
+    Returns:
+    A tuple containing two elements:
+           1. token_count (int): The number of tokens in the input text.
+           2. vector (list or str): The embedding vector if successful, or an error message if an exception occurs.
+
+    Raises:
+    Exception: Captures and returns any exceptions that occur during the API call or processing of the response.
+    """
+
     # initialize client
     client = OpenAI(
     api_key=API_KEY,  
