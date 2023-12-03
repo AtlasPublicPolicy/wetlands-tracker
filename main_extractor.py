@@ -54,10 +54,9 @@ def restart_or_update(redivis_dataset, update, n_days, max_notices, district = "
         
         # ## Set up the reference to Redivis and get as df
         scraped_notices = redivis_dataset.table("main_notices").to_pandas_dataframe(variables = ["noticeID", "usaceWebUrl", "datePublished"])
-        print(f"The number of notices found on Redivis is {len(scraped_notices)}")
-        # scraped_notices = pd.read_csv(r'data_schema/main_df_2023_11_20.csv')
-        # scraped_notices = scraped_notices[["noticeID", "usaceWebUrl", "datePublished"]]
-
+        print(f"The number of notices found on Redivis main table is {len(scraped_notices)}")
+        scraped_notices_list = scraped_notices["usaceWebUrl"].to_list()
+            
         ## option 2-download csv from redivis to dir
 
         # Perform a query on the Demo CMS Medicare data. Table at https://redivis.com/demo/datasets/1754/tables
@@ -74,10 +73,13 @@ def restart_or_update(redivis_dataset, update, n_days, max_notices, district = "
         print(f"The number of notices retreived in date range: {len(weblist_ndays)}.")
 
         # C. Subset the most recent notices to only those that are not in database already
-        #scraped_notices_list = [usaceWebUrl[:4] + "s" + usaceWebUrl[4:] for usaceWebUrl in scraped_notices["usaceWebUrl"]]  ## this was because of and 's' discrepancy between rss
-        scraped_notices_list = [usaceWebUrl for usaceWebUrl in scraped_notices["usaceWebUrl"]]
         weblist = weblist_ndays[~weblist_ndays["usaceWebUrl"].isin(scraped_notices_list)]
-
+        
+        # D. Check if the there are more notices than the maxmium notices set in the configuration
+        weblist_4m = scrape_rss_webpage.update_weblist_from_rss(district, 120)
+        weblist_4m_noReidvis = weblist_4m[~weblist_4m["usaceWebUrl"].isin(scraped_notices_list)]
+        if len(weblist_4m_noReidvis) > max_notices:
+            print("WARNING: Notices updated are more than the maximum notices set in the configuration")
         
     # (2) Scrape the webpage for each public notice to get more detailed information
     
@@ -110,7 +112,7 @@ def restart_or_update(redivis_dataset, update, n_days, max_notices, district = "
 
 
 
-def data_schema_preprocess(df_base, redivis_dataset):
+def data_schema_preprocess(df_base, redivis_dataset, GPT_MODEL):
     """
     Proprocess the raw scraping data: remove all unknowns and generate noticeID
     """
@@ -133,7 +135,7 @@ def data_schema_preprocess(df_base, redivis_dataset):
     df['noticeID'] = 'Notice_NO_' + (df.index + noticeID_start_on).astype(str)
 
     #E D. Generate column of token counts
-    encoding = tiktoken.encoding_for_model('gpt-3.5-turbo')
+    encoding = tiktoken.encoding_for_model(GPT_MODEL)
     
     # Count the number of tokens
     df['tokens'] = df['pdf_character'].apply(lambda x: len(encoding.encode(x)))
@@ -212,13 +214,7 @@ def data_schema_summarization(df, price_cap, AZURE_ENDPOINT, AZURE_API_KEY, redi
                 print(f"After batch {i}, total characters: {character_count_all}, Total cost: ${total_cost:.6f}")
             
             if total_cost >= 0.95 * price_cap:
-                
-                # ask for user's decision:
-                user_input = input(f"95% of pre-set price cap exceeded. Current estimated cost: ${total_cost:.6f}. Do you want to continue? (yes/no): ")
-        
-                if user_input.lower() != 'yes':
-                    print("Stop running.")
-                    break
+                print("95% of pre-set price cap exceeded")
 
         except Exception as e:
             print(f'Batch {i} failed to process due to: {e}')
@@ -615,7 +611,7 @@ def data_schema(df, aws_access_key_id, aws_secret_access_key, redivis_dataset):
     location_df = clean_special_characters(location_df, ['detail'])
     
     return {
-        # "aws_df": aws_df, 
+            "aws_df": aws_df, 
             "main_df": main_df, 
             "manager_df": manager_df, 
             "character_df": character_df, 
@@ -766,7 +762,7 @@ def dataframe_to_csv(df, df_name, directory):
     today = datetime.today()
     
     # Extract date components
-    date_str = today.strftime('%Y_%m_%d')
+    date_str = today.strftime('%Y_%m_%d_%H_%M')
     
     # Create the filename with the specified prefix, year, and date
     filename = f'{directory}{str(df_name)}_{date_str}.csv'
@@ -791,7 +787,7 @@ def upload_redivis(tbl_to_upload, redivis_dataset, directory, overwrite_redivis 
 
     # Extract date components
     today = datetime.today()
-    date_str = today.strftime('%Y_%m_%d')
+    date_str = today.strftime('%Y_%m_%d_%H_%M')
     
     # Get a list of uploading file pathes
     if tbl_to_upload == "all": 

@@ -573,7 +573,7 @@ def get_pdf_location(pdf_text, district):
     Get location of work
     """
     
-    if re.findall(r'L\s?[Oo]\s?[Cc]\s?[Aa]\s?[Tt]\s?[Ii]\s?[Oo]\s?[Nn]', pdf_text) != 0:
+    if len(re.findall(r'L\s?[Oo]\s?[Cc]\s?[Aa]\s?[Tt]\s?[Ii]\s?[Oo]\s?[Nn]', pdf_text)) != 0:
         
         if district == "mvn":
             try:

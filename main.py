@@ -43,8 +43,10 @@ class configuration:
         load_dotenv(r'api_keys.env')
 
         # Azure
-        self.AZURE_ENDPOINT = os.environ.get('AZURE_ENDPOINT')
-        self.AZURE_API_KEY = os.environ.get('AZURE_API_KEY')
+        self.AZURE_ENDPOINT = "https://text-ai-language.cognitiveservices.azure.com/"
+        # os.environ.get('AZURE_ENDPOINT')
+        self.AZURE_API_KEY = "3a31bce0d44349468526ce58651f7675"
+        # os.environ.get('AZURE_API_KEY')
 
         # Redivis
         self.REDIVIS_API_KEY = os.environ.get('REDIVIS_API_KEY')
@@ -94,8 +96,8 @@ class configuration:
         ## 11) If you have problem running OCR(Optical Character Recognition), please specify the path for tesseract.exe such as "C:/Program Files/Tesseract-OCR/tesseract.exe".
         self.tesseract_path = None
         
-        ## 12) Generate visualization in error report or not? 1, yes; 0, no
-        self.viz = 1
+        ## 12) Set GPT model
+        self.GPT_MODEL = "gpt-3.5-turbo-0613"
 
 
 ###############################
@@ -142,7 +144,8 @@ def main(config):
 
         ## Pre-clean
         df = main_extractor.data_schema_preprocess(df_base, 
-                                                   config.redivis_dataset)
+                                                   config.redivis_dataset,
+                                                   config.GPT_MODEL)
 
         ## Clean/Validation
 
@@ -202,16 +205,10 @@ def main(config):
         main_extractor.upload_redivis(config.tbl_to_upload, config.redivis_dataset, config.directory, config.overwrite_redivis)
         
         ## Error report
-        markdown_content = error_report(config.directory, config.viz)
+        markdown_content = error_report(config.directory)
 
         with open("error_report.md", "w", encoding="utf-8") as f:
             f.write(markdown_content)
-            
-        # Construct the path to the Pandoc executable within the virtual environment
-        # pandoc_path = os.path.join(os.path.dirname(__file__), 'venv', 'Lib', 'site-packages', 'pandoc-3.1.9', 'pandoc.exe')
-            
-        # subprocess.run(
-            # [pandoc_path, "error_report.md", "-o", "error_report.pdf"])
             
     except Exception as e:
         logging.error(str(e), exc_info=True)

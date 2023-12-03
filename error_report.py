@@ -21,7 +21,7 @@ from IPython.display import Markdown
 
 
 
-def error_report(directory, visualization):
+def error_report(directory):
 
     # Read in tables 
     raw_df = pd.read_csv(f"{directory}raw_df.csv")
@@ -187,53 +187,53 @@ def error_report(directory, visualization):
     
     ## Visualization 
     
-    def visualize_and_summarize_by_threshold(df, threshold_perc):
-        """
-        Function to create a horizontal bar plot for categories with a percentage above the threshold,
-        and to print out the unique values and total frequency for categories below that threshold.
+#     def visualize_and_summarize_by_threshold(df, threshold_perc):
+#         """
+#         Function to create a horizontal bar plot for categories with a percentage above the threshold,
+#         and to print out the unique values and total frequency for categories below that threshold.
 
-        :param df: DataFrame with 'index', 'Count', and 'percent' columns.
-        :param threshold_perc: Percentage threshold to filter categories.
-        """
+#         :param df: DataFrame with 'index', 'Count', and 'percent' columns.
+#         :param threshold_perc: Percentage threshold to filter categories.
+#         """
 
-        # Select categories above the threshold percentage
-        df_above_threshold = df[df['percent'] >= threshold_perc]
+#         # Select categories above the threshold percentage
+#         df_above_threshold = df[df['percent'] >= threshold_perc]
 
-        # Plotting the horizontal bar graph for categories above the threshold
-        plt.figure(figsize=(8, 6))
-        barplot = sns.barplot(x='percent', y='index', data=df_above_threshold, palette='Greens_d', hue='index')
+#         # Plotting the horizontal bar graph for categories above the threshold
+#         plt.figure(figsize=(8, 6))
+#         barplot = sns.barplot(x='percent', y='index', data=df_above_threshold, palette='Greens_d', hue='index')
 
-        # Annotating each bar with the count
-        for index, row in df_above_threshold.iterrows():
-            barplot.text(row['percent'], index, f'{row["Count"]}', color='black', ha="left")
+#         # Annotating each bar with the count
+#         for index, row in df_above_threshold.iterrows():
+#             barplot.text(row['percent'], index, f'{row["Count"]}', color='black', ha="left")
 
-        plt.xlabel('Percentage')
-        plt.ylabel('Categories', fontsize=14)
-        plt.title('Categories Above Threshold (Counts Labeled Near Bar)', fontsize=18 )
-        plt.tight_layout()
+#         plt.xlabel('Percentage')
+#         plt.ylabel('Categories', fontsize=14)
+#         plt.title('Categories Above Threshold (Counts Labeled Near Bar)', fontsize=18 )
+#         plt.tight_layout()
     
-        # Filtering for unique values below the threshold percentage
-        df_below_threshold = df[df['percent'] < threshold_perc]
-        unique_values = df_below_threshold['index'].unique()
-        total_frequency = df_below_threshold['Count'].sum()
+#         # Filtering for unique values below the threshold percentage
+#         df_below_threshold = df[df['percent'] < threshold_perc]
+#         unique_values = df_below_threshold['index'].unique()
+#         total_frequency = df_below_threshold['Count'].sum()
 
-        # Print the unique values and total frequency
-        print("-"*60)
-        print("\n")
-        print("Other terms captured:", ", ".join(unique_values))
-        print("\n")
-        print("-"*60)
-        print("Total frequency:", total_frequency)
+#         # Print the unique values and total frequency
+#         print("-"*60)
+#         print("\n")
+#         print("Other terms captured:", ", ".join(unique_values))
+#         print("\n")
+#         print("-"*60)
+#         print("Total frequency:", total_frequency)
 
     # Example usage of the function (assuming a DataFrame is already prepared)
-    if visualization == 1:
-        visualize_and_summarize_by_threshold(impact_type_counts_df, 1) # Replace 'your_dataframe' with your actual DataFrame variable
-        plt.savefig("data_schema/impact_type_viz.png")
-        markdown_content += f"![Impact Type Counts]({directory}impact_type_viz.png)\n\n"
+#     if visualization == 1:
+#         visualize_and_summarize_by_threshold(impact_type_counts_df, 1) # Replace 'your_dataframe' with your actual DataFrame variable
+#         plt.savefig("data_schema/impact_type_viz.png")
+#         markdown_content += f"![Impact Type Counts]({directory}impact_type_viz.png)\n\n"
 
-        visualize_and_summarize_by_threshold(impact_duration_counts_df, 1) # Replace 'your_dataframe' with your actual DataFrame variable
-        plt.savefig("data_schema/impact_duration_viz.png")
-        markdown_content += f"![Impact Duration Counts]({directory}impact_duration_viz.png)\n\n"
+#         visualize_and_summarize_by_threshold(impact_duration_counts_df, 1) # Replace 'your_dataframe' with your actual DataFrame variable
+#         plt.savefig("data_schema/impact_duration_viz.png")
+#         markdown_content += f"![Impact Duration Counts]({directory}impact_duration_viz.png)\n\n"
     
     
     # Compare the results pulled by OpenAI and regex
@@ -279,17 +279,17 @@ def error_report(directory, visualization):
     
     # Detailed info for notices that have unmatched regex and LLM results
     
-    if visualization == 1:
-        df = val_df[['web_title', 'pdf_impact', 'wetland_llm_dict', 'lev_distance', 'len1', 'len2']].copy()
-        # llm_regex_detail = df.sort_values(by='len1')
-        # llm_regex_detail_md = llm_regex_detail.to_markdown(index=False)
-        # markdown_content += f"### Detailed Table\n\n{llm_regex_detail_md}\n\n"
+#     if visualization == 1:
+#         df = val_df[['web_title', 'pdf_impact', 'wetland_llm_dict', 'lev_distance', 'len1', 'len2']].copy()
+#         # llm_regex_detail = df.sort_values(by='len1')
+#         # llm_regex_detail_md = llm_regex_detail.to_markdown(index=False)
+#         # markdown_content += f"### Detailed Table\n\n{llm_regex_detail_md}\n\n"
         
-        fig, ax = plt.subplots(1, figsize=(8, 8))
-        df[(df.len1<2000)].len1.hist(color='red', alpha=.6, bins=30, legend=True)
-        df[(df.len2<2000)].len2.hist(color='blue', alpha=.5, bins=30, legend=True)
-        fig.savefig("data_schema/llm_regex_viz.png")
-        markdown_content += f"![LLM vs Regex histograms]({directory}llm_regex_viz.png)\n\n"
+#         fig, ax = plt.subplots(1, figsize=(8, 8))
+#         df[(df.len1<2000)].len1.hist(color='red', alpha=.6, bins=30, legend=True)
+#         df[(df.len2<2000)].len2.hist(color='blue', alpha=.5, bins=30, legend=True)
+#         fig.savefig("data_schema/llm_regex_viz.png")
+#         markdown_content += f"![LLM vs Regex histograms]({directory}llm_regex_viz.png)\n\n"
     
     # Remove non-ASCII characters
     non_ascii_pattern = re.compile('[^\x00-\x7F]+')

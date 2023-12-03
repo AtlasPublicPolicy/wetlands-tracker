@@ -19,6 +19,7 @@ def get_item(soup, item_i):
     # Get the info in the box for each notice
     item = soup.find_all("div", class_="desc")[item_i]
     web_url = item.find("a", class_="title").get("href")
+    web_url = web_url[:4] + "s" + web_url[4:]
     web_title = item.find("a", class_="title").get_text()
     publish_date = item.time.get("datetime")
     try:
@@ -316,7 +317,7 @@ def get_web_location(web_text, district):
     Get all info in "LOCATION OF WORK"
     """
     
-    if re.findall(r'L\s?[Oo]\s?[Cc]\s?[Aa]\s?[Tt]\s?[Ii]\s?[Oo]\s?[Nn]', web_text) != 0:
+    if len(re.findall(r'L\s?[Oo]\s?[Cc]\s?[Aa]\s?[Tt]\s?[Ii]\s?[Oo]\s?[Nn]', web_text)) != 0:
         
         if district == "mvn":
             try:
@@ -408,7 +409,7 @@ def get_web_mitigation(web_text, district):
             web_mitigation = "unknown"
     
     if district in ["sam", "saj", "swg"]:
-        if len(re.findall(r'(A\s?V\s?O\s?I\s?D\s?A\s?N\s?C\s?E\s?(&|A\s?N\s?D)\s?M\s?I\s?N\s?I\s?M\s?I\s?Z\s?A\s?T\s?I\s?O\s?N|C?\s?O?\s?M?\s?P?\s?E?\s?N?\s?S?\s?A?\s?T?\s?O?\s?R?\s?Y?\s?M\s?I\s?T\s?I\s?G\s?A\s?T\s?I\s?O\s?N|$)', web_text)) != 0:
+        if len(re.findall(r'(A\s?V\s?O\s?I\s?D\s?A\s?N\s?C\s?E\s?(&|A\s?N\s?D)\s?M\s?I\s?N\s?I\s?M\s?I\s?Z\s?A\s?T\s?I\s?O\s?N|C?\s?O?\s?M?\s?P?\s?E?\s?N?\s?S?\s?A?\s?T?\s?O?\s?R?\s?Y?\s?M\s?I\s?T\s?I\s?G\s?A\s?T\s?I\s?O\s?N)', web_text)) != 0:
                 # web_mitigation = re.search(r'(AVOIDANCE|COMPENSATORY|MITIGATION).*?(?=WATER|The applicant will apply|The applicant has applied|CULTURAL)', web_text).group().strip()
             try:
                 web_avio_mini = re.search(r'M\s?[Ii]\s?[Nn]\s?[Ii]\s?[Mm]\s?[Ii]\s?[Zz]\s?[Aa]\s?[Tt]\s?[Ii]\s?[Oo]\s?[Nn]\s?[Ii]?\s?[Nn]?\s?[Ff]?\s?[Oo]?\s?[Rr]?\s?[Mm]?\s?[Aa]?\s?[Tt]?\s?[Ii]?\s?[Oo]?\s?[Nn]?.+?(?=([A-Z]{6,}[:\s]|T\s?h\s?e\s?a\s?p\s?p\s?l\s?i\s?c\s?a\s?n\s?t\s?w\s?i\s?l\s?l\s?a\s?p\s?p\s?l\s?y))', web_text).group().strip()
