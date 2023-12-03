@@ -24,6 +24,7 @@ from llmFunctions import openAIfunc_wetland, openAIfunc_project, openai_embed, d
 
 import pathlib
 import os
+import logging
 
 #set temp directory
 temp_path = r'tempdir/'
@@ -32,7 +33,7 @@ assert tempfile.gettempdir() == temp_path
 
 # Run the process that exports to the temp dir
 
-def restart_or_update(redivis_dataset, update, n_days, max_notices, district = "all", tesseract_path = None):
+def restart_or_update(redivis_dataset, update, n_days, max_notices, logging, district = "all", tesseract_path = None):
     """
     Generate the main scraping results
     
@@ -46,6 +47,7 @@ def restart_or_update(redivis_dataset, update, n_days, max_notices, district = "
     # First-time scraping: scrape the USACE website to get a list of notice webpage links
     if update == 0:
         weblist = scrape_rss_webpage.get_weblist(district)
+        print(f"{len(weblist)} public notices captured")
     
     # Update scraping: scrape the RSS feed to get new notice webpage links
     if update == 1:
@@ -53,7 +55,8 @@ def restart_or_update(redivis_dataset, update, n_days, max_notices, district = "
         # A. Get current version of data from Redivis
         
         # ## Set up the reference to Redivis and get as df
-        scraped_notices = redivis_dataset.table("main_notices").to_pandas_dataframe(variables = ["noticeID", "usaceWebUrl", "datePublished"])
+        scraped_notices = redivis_dataset.table("main_notices").to_pandas_dataframe(variables = ["noticeID", "usaceWebUrl", "datePublished"],
+                                                                                    progress=False)
         print(f"The number of notices found on Redivis main table is {len(scraped_notices)}")
         scraped_notices_list = scraped_notices["usaceWebUrl"].to_list()
             
@@ -74,12 +77,15 @@ def restart_or_update(redivis_dataset, update, n_days, max_notices, district = "
 
         # C. Subset the most recent notices to only those that are not in database already
         weblist = weblist_ndays[~weblist_ndays["usaceWebUrl"].isin(scraped_notices_list)]
+        #PRINT NEW NOTICES
+        print(f'Notices published in date range not found in Redivis = {len(weblist)}')
         
-        # D. Check if the there are more notices than the maxmium notices set in the configuration
-        weblist_4m = scrape_rss_webpage.update_weblist_from_rss(district, 120)
-        weblist_4m_noReidvis = weblist_4m[~weblist_4m["usaceWebUrl"].isin(scraped_notices_list)]
-        if len(weblist_4m_noReidvis) > max_notices:
-            print("WARNING: Notices updated are more than the maximum notices set in the configuration")
+        # D. Check if the there are more notices updated in the past n days than the maxmium notices set in the configuration
+        if len(weblist) > max_notices:
+            warning_message = f"Notices updated ({len(weblist)}) are more than the maximum notices set in the configuration ({max_notices})"
+            print(f"WARNING: {warning_message}")
+            # Log the warning message to the file
+            logging.warning(warning_message)
         
     # (2) Scrape the webpage for each public notice to get more detailed information
     
@@ -87,18 +93,12 @@ def restart_or_update(redivis_dataset, update, n_days, max_notices, district = "
     
     # Merge with weblist table
     webpage = weblist.reset_index().join(webpage)
-
-    #PRINT NEW NOTICES
-    print('Notices published in date range not found in Redivis =', webpage.shape[0])
     
-    # if webpage.shape[0] = 0:
-        # print('No new notices to update. Stopping process...")
-        #break
     # sort by date
     webpage = webpage.sort_values(by='datePublished', ascending=False)
 
     # subset to max_notices - number of newest notices
-    webpage = webpage.head(max_notices)
+    # webpage = webpage.head(max_notices)
     webpage = webpage[:max_notices]
     print('Notices to process =', webpage.shape[0])
 
@@ -129,7 +129,8 @@ def data_schema_preprocess(df_base, redivis_dataset, GPT_MODEL):
     ## C. Create the primary key column noticeID
     
     ### get all the noticeID in Redivis
-    scraped_notices = redivis_dataset.table("main_notices").to_pandas_dataframe(variables = ["noticeID", "usaceWebUrl", "datePublished"])
+    scraped_notices = redivis_dataset.table("main_notices").to_pandas_dataframe(variables = ["noticeID", "usaceWebUrl", "datePublished"],
+                                                                                progress=False)
     # scraped_notices = pd.read_csv(r'data_schema/main_df_2023_11_20.csv')
     # scraped_notices = scraped_notices[["noticeID", "usaceWebUrl", "datePublished"]] 
 
@@ -162,7 +163,7 @@ def data_schema_preprocess(df_base, redivis_dataset, GPT_MODEL):
 #Global variable for the 3 Azure/OpenAI functions
 batch_size = 10
 
-def data_schema_summarization(df, price_cap, AZURE_ENDPOINT, AZURE_API_KEY, redivis_dataset, n_sentences = 4):
+def data_schema_summarization(df, price_cap, AZURE_ENDPOINT, AZURE_API_KEY, redivis_dataset, n_sentences, logging):
     """
     # Pricing - https://azure.microsoft.com/en-us/pricing/details/cognitive-services/language-service/
     # $2 for 1000 text records - 1000 character units
@@ -175,7 +176,7 @@ def data_schema_summarization(df, price_cap, AZURE_ENDPOINT, AZURE_API_KEY, redi
     fulltext_df = fulltext_df[~(fulltext_df.pdf_full_text=="unknown")].copy()
 
     # Redivis table
-    fulltext_df_redivis = redivis_dataset.table("fulltext").to_pandas_dataframe(variables = ["rowID"])
+    fulltext_df_redivis = redivis_dataset.table("fulltext").to_pandas_dataframe(variables = ["rowID"], progress=False)
     #create primary key - rowID
     fulltext_df['rowID'] = fulltext_df.reset_index().index + fulltext_df_redivis.shape[0] + 1
     
@@ -198,10 +199,14 @@ def data_schema_summarization(df, price_cap, AZURE_ENDPOINT, AZURE_API_KEY, redi
             print(f'Processing batch {i}')
 
             # Assuming getDocumentAbstractiveSummary() is a predefined function
-            batch['short_summary'] = [getDocumentAbstractiveSummary(x, 
-                                                                    endpoint=AZURE_ENDPOINT, 
-                                                                    key=AZURE_API_KEY, 
-                                                                    sentenceCount=n_sentences) for x in batch['pdf_trimmed']]
+            # batch['short_summary'] = [getDocumentAbstractiveSummary(x, 
+            #                                                         endpoint=AZURE_ENDPOINT, 
+            #                                                         key=AZURE_API_KEY, 
+            #                                                         sentenceCount=n_sentences) for x in batch['pdf_trimmed']]
+            batch['short_summary'] = batch['pdf_trimmed'].apply(lambda x: getDocumentAbstractiveSummary(x, 
+                                                                                                        endpoint=AZURE_ENDPOINT, 
+                                                                                                        key=AZURE_API_KEY, 
+                                                                                                        sentenceCount=n_sentences))
 
             # Concatenate the processed batch to the final DataFrame
             summary_df = pd.concat([summary_df, batch], ignore_index=True)
@@ -220,10 +225,15 @@ def data_schema_summarization(df, price_cap, AZURE_ENDPOINT, AZURE_API_KEY, redi
                 print("95% of pre-set price cap exceeded")
 
         except Exception as e:
-            print(f'Batch {i} failed to process due to: {e}')
+            error_message = f'Batch {i} failed to process due to: {e}'
+            print(error_message)
+            logging.errors(error_message)
 
     # Optional: Drop the "pdf_full_text" column if you no longer need it in the final DataFrame
     summary_df = summary_df.drop(columns=["pdf_full_text", "pdf_trimmed"])
+    
+    # Clean special characters in the fulltext_df (do no remove special character before summarization to avoid generating misleading info)
+    fulltext_df = clean_special_characters(fulltext_df, ['pdf_full_text', 'pdf_trimmed'])
     
     return {"fulltext_df": fulltext_df,
             "summary_df": summary_df}
@@ -231,7 +241,7 @@ def data_schema_summarization(df, price_cap, AZURE_ENDPOINT, AZURE_API_KEY, redi
     
     
         
-def data_schema_impact(df, GPT_MODEL_SET, OPENAI_API_KEY, redivis_dataset):
+def data_schema_impact(df, GPT_MODEL_SET, OPENAI_API_KEY, redivis_dataset, logging):
     """
     Apply LLM to extract the information about the impacts on wetlands
     """
@@ -258,13 +268,17 @@ def data_schema_impact(df, GPT_MODEL_SET, OPENAI_API_KEY, redivis_dataset):
             print(f'Processing batch {i}')
 
             # LLM - wetland impact
-            batch['wetland_llm_dict'] = batch['pdf_character'].apply(lambda x: openAIfunc_wetland(x, API_KEY=OPENAI_API_KEY, GPT_MODEL=GPT_MODEL_SET))
+            batch['wetland_llm_dict'] = batch['pdf_character'].apply(lambda x: openAIfunc_wetland(x, 
+                                                                                                  API_KEY=OPENAI_API_KEY, 
+                                                                                                  GPT_MODEL=GPT_MODEL_SET))
 
             # Append the processed batch to the list
             processed_batches.append(batch)
 
         except Exception as e:
-            print(f'Batch {i} failed to process due to: {e}')
+            error_message = f'Batch {i} failed to process due to: {e}'
+            print(error_message)
+            logging.errors(error_message)
 
     ### Concatenate all processed batches to form the final DataFrame
     wetland_impact_df = pd.concat(processed_batches, ignore_index=True)
@@ -346,7 +360,7 @@ def data_schema_impact(df, GPT_MODEL_SET, OPENAI_API_KEY, redivis_dataset):
                 wetland_final_df.impact_quantity.isna())]
 
     # Generate row ID
-    wetland_impact_df_redivis = redivis_dataset.table("wetland_impact").to_pandas_dataframe(variables = ["rowID"])
+    wetland_impact_df_redivis = redivis_dataset.table("wetland_impact").to_pandas_dataframe(variables = ["rowID"], progress=False)
     wetland_final_df['rowID'] = wetland_final_df.reset_index().index + wetland_impact_df_redivis.shape[0] + 1
 
     del wetland_df
@@ -357,7 +371,7 @@ def data_schema_impact(df, GPT_MODEL_SET, OPENAI_API_KEY, redivis_dataset):
 
 
 
-def data_schema_embedding(df,GPT_MODEL_SET, OPENAI_API_KEY, redivis_dataset):
+def data_schema_embeding(df, GPT_MODEL_SET, OPENAI_API_KEY, redivis_dataset, logging):
     """
     Generate the project type and embedding table 
     """
@@ -387,7 +401,9 @@ def data_schema_embedding(df,GPT_MODEL_SET, OPENAI_API_KEY, redivis_dataset):
             embed_columns.columns = ['embed_tokens', 'embeddings']  # Assuming the output is two columns
 
             # Apply the openAIfunc_project function
-            project_llm_dict_series = batch['pdf_character'].apply(lambda x: openAIfunc_project(x, API_KEY=OPENAI_API_KEY,GPT_MODEL=GPT_MODEL_SET))
+            project_llm_dict_series = batch['pdf_character'].apply(lambda x: openAIfunc_project(x, 
+                                                                                                API_KEY=OPENAI_API_KEY, 
+                                                                                                GPT_MODEL=GPT_MODEL_SET))
 
             # Concatenate the new columns to the batch
             batch = pd.concat([batch, project_llm_dict_series.apply(pd.Series), embed_columns], axis=1)
@@ -396,7 +412,9 @@ def data_schema_embedding(df,GPT_MODEL_SET, OPENAI_API_KEY, redivis_dataset):
             processed_batches.append(batch)
 
         except Exception as e:
-            print(f'Batch {i} failed to process due to: {e}')
+            error_message = f'Batch {i} failed to process due to: {e}'
+            print(error_message)
+            logging.errors(error_message)
 
     # Concatenate all processed batches into the final DataFrame
     embed_final_df = pd.concat(processed_batches, ignore_index=True)
@@ -406,7 +424,7 @@ def data_schema_embedding(df,GPT_MODEL_SET, OPENAI_API_KEY, redivis_dataset):
     embed_final_df[["pdf_character", "project_detail", "total_project_area", "project_category"]] = embed_final_df[["pdf_character", "project_detail", "total_project_area", "project_category"]].fillna('unknown', inplace=False)
 
     # Generate row ID
-    embed_df_redivis = redivis_dataset.table("embed_project_type").to_pandas_dataframe(variables = ["rowID"])
+    embed_df_redivis = redivis_dataset.table("embed_project_type").to_pandas_dataframe(variables = ["rowID"], progress=False)
     embed_final_df['rowID'] = embed_final_df.index + embed_df_redivis.shape[0] + 1
 
     del embed_df
@@ -540,7 +558,7 @@ def data_schema(df, aws_access_key_id, aws_secret_access_key, redivis_dataset):
                               (manager_df['email'] == 'unknown'))].copy()
     
     # Redivis table reference
-    manager_df_redivis = redivis_dataset.table("manager").to_pandas_dataframe(variables = ["rowID"])
+    manager_df_redivis = redivis_dataset.table("manager").to_pandas_dataframe(variables = ["rowID"], progress=False)
     #create rowID
     manager_df['rowID'] = manager_df.reset_index().index + manager_df_redivis.shape[0] + 1
 
@@ -559,7 +577,7 @@ def data_schema(df, aws_access_key_id, aws_secret_access_key, redivis_dataset):
     character_df = character_df[~(character_df.text=="unknown")].copy()
 
     # Redivis table reference
-    character_df_redivis = redivis_dataset.table("character").to_pandas_dataframe(variables = ["rowID"])
+    character_df_redivis = redivis_dataset.table("character").to_pandas_dataframe(variables = ["rowID"], progress=False)
     # Create rowID
     character_df['rowID'] = character_df.reset_index().index + character_df_redivis.shape[0] + 1
 
@@ -578,7 +596,7 @@ def data_schema(df, aws_access_key_id, aws_secret_access_key, redivis_dataset):
     mitigation_df = mitigation_df[~(mitigation_df.text=="unknown")].copy()
 
     # Redivis table reference
-    mitigation_df_redivis = redivis_dataset.table("mitigation").to_pandas_dataframe(variables = ["rowID"])
+    mitigation_df_redivis = redivis_dataset.table("mitigation").to_pandas_dataframe(variables = ["rowID"], progress=False)
     #create rowID
     mitigation_df['rowID'] = mitigation_df.reset_index().index + mitigation_df_redivis.shape[0] + 1
 
@@ -599,7 +617,7 @@ def data_schema(df, aws_access_key_id, aws_secret_access_key, redivis_dataset):
     location_df = location_df[~(location_df.detail=="unknown")].copy()
 
     # Redivis table
-    location_df_redivis = redivis_dataset.table("location").to_pandas_dataframe(variables = ["rowID"])
+    location_df_redivis = redivis_dataset.table("location").to_pandas_dataframe(variables = ["rowID"], progress=False)
     #create rowID
     location_df['rowID'] = location_df.reset_index().index + location_df_redivis.shape[0] + 1
 
@@ -766,7 +784,7 @@ def dataframe_to_csv(df, df_name, directory):
     
     # Extract date components
     date_str = today.strftime('%Y_%m_%d_%H_%M')
-    # fulltext, validation_df = UTF-8
+    
     # Create the filename with the specified prefix, year, and date
     filename = f'{directory}{str(df_name)}_{date_str}.csv'
     

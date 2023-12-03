@@ -66,7 +66,7 @@ class configuration:
         self.update = 1
         
         ## 2）How many days in the past you would like search for updated notices: numeric # from 0 to 500; default as 100
-        self.n_days = 100
+        self.n_days = 60
 
         ## 3) How many maximum notices (sorted by date) to download?
         self.max_notices = 2
@@ -88,7 +88,7 @@ class configuration:
         self.directory = "data_schema/"
 
         ## 9) Overwrite file with same name on Redivis
-        self.overwrite_redivis = 1
+        self.overwrite_redivis = 0
 
         ## 10) Skip paid services including OpenAI and Azure Summaries. 1, skip; 0, do not skip; default = 0
         self.skipPaid = 0
@@ -120,6 +120,10 @@ def main(config):
         datefmt='%Y-%m-%d %H:%M:%S',
         level=logging.INFO)
     
+    # Create the directory data_schema when it does not exist 
+    if not os.path.exists(config.directory):
+        os.makedirs(config.directory)
+    
     try:
         ## Connect to Redivis DB:
         os.environ['REDIVIS_API_TOKEN'] = config.REDIVIS_API_KEY
@@ -130,18 +134,15 @@ def main(config):
                                                    config.update, 
                                                    config.n_days, 
                                                    config.max_notices,
+                                                   logging,
                                                    config.district,
                                                    config.tesseract_path
                                                    )
-        # Print the number of notices retrieved
-        print(f"Number of notices retrieved: {len(df_base)}")
-
 
         # EXPORT RAW_DF AT THIS STAGE - EXCLUDE FULL_TEXT COLUMN
         raw_df = df_base.drop(columns=['pdf_full_text', 'pdf_trimmed'])
         raw_df.to_csv(f'{config.directory}raw_df.csv', index=False)
-
-
+        
         ## Pre-clean
         df = main_extractor.data_schema_preprocess(df_base, 
                                                    config.redivis_dataset,
@@ -162,16 +163,19 @@ def main(config):
                                                                                 config.AZURE_ENDPOINT, 
                                                                                 config.AZURE_API_KEY, 
                                                                                 config.redivis_dataset,
-                                                                                config.n_sentences)
+                                                                                config.n_sentences,
+                                                                                logging)
             main_tbls.update(fulltext_and_summary_tbl)
         else:
             print("Skipping Azure summaries")
 
         ### C. LLM: wetland impacts 
         if config.skipPaid == 0:
-            impact_tbl = main_extractor.data_schema_impact(df, config.GPT_MODEL_SET,
+            impact_tbl = main_extractor.data_schema_impact(df, 
+                                                           config.GPT_MODEL_SET,
                                                            config.OPENAI_API_KEY,
-                                                           config.redivis_dataset)
+                                                           config.redivis_dataset,
+                                                           logging)
             main_tbls.update({"wetland_final_df":impact_tbl["wetland_final_df"]})
         else:
             print("Skipping wetland impacts")
@@ -179,6 +183,7 @@ def main(config):
         ### D.generate a table for troubleshooting and validation
         if config.skipPaid == 0:
             validation_tbl_regex = df.drop(["pdf_trimmed", "tokens"], axis = 1)
+            validation_tbl_regex = main_extractor.clean_special_characters(validation_tbl_regex, validation_tbl_regex.columns.to_list())
             validation_tbl_llm = impact_tbl["wetland_impact_df"][["noticeID", "wetland_llm_dict"]]
             validation_df = pd.merge(validation_tbl_regex, validation_tbl_llm, on="noticeID") 
             main_tbls.update({"validation_df":validation_df})
@@ -187,9 +192,11 @@ def main(config):
 
         ### E. LLM: embeding and project types
         if config.skipPaid == 0:
-            embeding_tbl = main_extractor.data_schema_embedding(df, config.GPT_MODEL_SET,
-                                                            config.OPENAI_API_KEY,
-                                                            config.redivis_dataset)
+            embeding_tbl = main_extractor.data_schema_embeding(df, 
+                                                               config.GPT_MODEL_SET,
+                                                               config.OPENAI_API_KEY,
+                                                               config.redivis_dataset,
+                                                               logging)
             main_tbls.update(embeding_tbl)
         else:
             print("Skipping embedings")
