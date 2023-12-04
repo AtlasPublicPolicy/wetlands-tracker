@@ -1,0 +1,110 @@
+azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://usacecognitive.cognitiveservices.azure.com/language/analyze-text/jobs?api-version=2023-04-01'
+Request method: 'POST'
+Request headers:
+    'Content-Type': 'application/json'
+    'Content-Length': '3761'
+    'Accept': 'application/json'
+    'x-ms-client-request-id': '722e4cdc-92b8-11ee-b828-4d200f16396a'
+    'User-Agent': 'azsdk-python-ai-textanalytics/5.3.0 Python/3.10.13 (Linux-5.15.0-1051-azure-x86_64-with-glibc2.31)'
+    'Ocp-Apim-Subscription-Key': 'REDACTED'
+A body is sent with the request
+azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 202
+Response headers:
+    'Content-Length': '0'
+    'operation-location': 'https://usacecognitive.cognitiveservices.azure.com/language/analyze-text/jobs/51abe4ea-a935-4dc9-9373-ffa81f49a233?api-version=2023-04-01'
+    'x-envoy-upstream-service-time': '147'
+    'apim-request-id': '75ed45d7-0543-46b1-b9ad-d716d7ad6ff7'
+    'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload'
+    'x-content-type-options': 'nosniff'
+    'x-ms-region': 'REDACTED'
+    'Date': 'Mon, 04 Dec 2023 15:18:57 GMT'
+azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://usacecognitive.cognitiveservices.azure.com/language/analyze-text/jobs/51abe4ea-a935-4dc9-9373-ffa81f49a233?api-version=2023-04-01'
+Request method: 'GET'
+Request headers:
+    'x-ms-client-request-id': '722e4cdc-92b8-11ee-b828-4d200f16396a'
+    'User-Agent': 'azsdk-python-ai-textanalytics/5.3.0 Python/3.10.13 (Linux-5.15.0-1051-azure-x86_64-with-glibc2.31)'
+    'Ocp-Apim-Subscription-Key': 'REDACTED'
+No body was attached to the request
+azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 200
+Response headers:
+    'Content-Length': '283'
+    'Content-Type': 'application/json; charset=utf-8'
+    'x-envoy-upstream-service-time': '10'
+    'apim-request-id': '24514a9c-bf82-4e8c-a4df-729b550c6825'
+    'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload'
+    'x-content-type-options': 'nosniff'
+    'x-ms-region': 'REDACTED'
+    'Date': 'Mon, 04 Dec 2023 15:18:57 GMT'
+azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://usacecognitive.cognitiveservices.azure.com/language/analyze-text/jobs/51abe4ea-a935-4dc9-9373-ffa81f49a233?api-version=2023-04-01'
+Request method: 'GET'
+Request headers:
+    'x-ms-client-request-id': '722e4cdc-92b8-11ee-b828-4d200f16396a'
+    'User-Agent': 'azsdk-python-ai-textanalytics/5.3.0 Python/3.10.13 (Linux-5.15.0-1051-azure-x86_64-with-glibc2.31)'
+    'Ocp-Apim-Subscription-Key': 'REDACTED'
+No body was attached to the request
+azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 200
+Response headers:
+    'Content-Length': '1095'
+    'Content-Type': 'application/json; charset=utf-8'
+    'x-envoy-upstream-service-time': '45'
+    'apim-request-id': '5e641d5b-c0b4-49da-adfe-75b89c5dd1ec'
+    'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload'
+    'x-content-type-options': 'nosniff'
+    'x-ms-region': 'REDACTED'
+    'Date': 'Mon, 04 Dec 2023 15:19:02 GMT'
+azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://usacecognitive.cognitiveservices.azure.com/language/analyze-text/jobs?api-version=2023-04-01'
+Request method: 'POST'
+Request headers:
+    'Content-Type': 'application/json'
+    'Content-Length': '4510'
+    'Accept': 'application/json'
+    'x-ms-client-request-id': '75543f34-92b8-11ee-b828-4d200f16396a'
+    'User-Agent': 'azsdk-python-ai-textanalytics/5.3.0 Python/3.10.13 (Linux-5.15.0-1051-azure-x86_64-with-glibc2.31)'
+    'Ocp-Apim-Subscription-Key': 'REDACTED'
+A body is sent with the request
+azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 202
+Response headers:
+    'Content-Length': '0'
+    'operation-location': 'https://usacecognitive.cognitiveservices.azure.com/language/analyze-text/jobs/ed589a23-2eb1-43a8-a715-69c43d258730?api-version=2023-04-01'
+    'x-envoy-upstream-service-time': '191'
+    'apim-request-id': '1810ed31-2037-445b-aefc-4247053a2de0'
+    'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload'
+    'x-content-type-options': 'nosniff'
+    'x-ms-region': 'REDACTED'
+    'Date': 'Mon, 04 Dec 2023 15:19:03 GMT'
+azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://usacecognitive.cognitiveservices.azure.com/language/analyze-text/jobs/ed589a23-2eb1-43a8-a715-69c43d258730?api-version=2023-04-01'
+Request method: 'GET'
+Request headers:
+    'x-ms-client-request-id': '75543f34-92b8-11ee-b828-4d200f16396a'
+    'User-Agent': 'azsdk-python-ai-textanalytics/5.3.0 Python/3.10.13 (Linux-5.15.0-1051-azure-x86_64-with-glibc2.31)'
+    'Ocp-Apim-Subscription-Key': 'REDACTED'
+No body was attached to the request
+azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 200
+Response headers:
+    'Content-Length': '283'
+    'Content-Type': 'application/json; charset=utf-8'
+    'x-envoy-upstream-service-time': '12'
+    'apim-request-id': 'dd4bc853-659c-4de5-9e98-bb64b3ae7aba'
+    'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload'
+    'x-content-type-options': 'nosniff'
+    'x-ms-region': 'REDACTED'
+    'Date': 'Mon, 04 Dec 2023 15:19:03 GMT'
+azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://usacecognitive.cognitiveservices.azure.com/language/analyze-text/jobs/ed589a23-2eb1-43a8-a715-69c43d258730?api-version=2023-04-01'
+Request method: 'GET'
+Request headers:
+    'x-ms-client-request-id': '75543f34-92b8-11ee-b828-4d200f16396a'
+    'User-Agent': 'azsdk-python-ai-textanalytics/5.3.0 Python/3.10.13 (Linux-5.15.0-1051-azure-x86_64-with-glibc2.31)'
+    'Ocp-Apim-Subscription-Key': 'REDACTED'
+No body was attached to the request
+azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 200
+Response headers:
+    'Content-Length': '1157'
+    'Content-Type': 'application/json; charset=utf-8'
+    'x-envoy-upstream-service-time': '52'
+    'apim-request-id': '11f480dd-121b-4964-b7d1-175647d0a698'
+    'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload'
+    'x-content-type-options': 'nosniff'
+    'x-ms-region': 'REDACTED'
+    'Date': 'Mon, 04 Dec 2023 15:19:08 GMT'
+httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"

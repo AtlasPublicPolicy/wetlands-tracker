@@ -2,6 +2,7 @@
 *.txt
 *.md
 *.png
+*.sh
 
 #redivis upload csvs
 *.csv
