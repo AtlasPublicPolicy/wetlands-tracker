@@ -10,6 +10,7 @@ import ast
 import os
 import tiktoken
 import redivis
+import sys
 import time
 from tqdm import tqdm
 from datetime import datetime
@@ -27,9 +28,9 @@ import os
 import logging
 
 #set temp directory
-temp_path = r'tempdir/'
-tempfile.tempdir=temp_path
-assert tempfile.gettempdir() == temp_path
+# temp_path = r'tempdir/'
+# tempfile.tempdir=temp_path
+# assert tempfile.gettempdir() == temp_path
 
 # Run the process that exports to the temp dir
 
@@ -86,7 +87,12 @@ def restart_or_update(redivis_dataset, update, n_days, max_notices, logging, dis
             print(f"WARNING: {warning_message}")
             # Log the warning message to the file
             logging.warning(warning_message)
-        
+
+    # no new notices
+    if len(weblist) == 0:
+        print("Exiting program, no new notices")
+        sys.exit()
+
     # (2) Scrape the webpage for each public notice to get more detailed information
     
     webpage = pd.DataFrame([scrape_rss_webpage.web_extraction(x, update) for x in weblist["usaceWebUrl"]])
@@ -645,7 +651,7 @@ def data_schema(df, aws_access_key_id, aws_secret_access_key, redivis_dataset):
             # "validation_df":validation_df
     }
 
-def geocode(dataset):
+def geocode(dataset, new_locations):
     """
     This function looks for lat/longs that have yet to be geocoded (not just for new new notices but all notices). 
     It then geocodes them and returns it as a dataframe.
@@ -653,11 +659,12 @@ def geocode(dataset):
     #Load needed tables
     ## Geocoded Locations
     table = dataset.table("geocoded_locations:9jz4")
-    geocodedDf = table.to_dataframe(progress=False)
+    geocodedDf = table.to_pandas_dataframe(progress=False)
 
     ## All Locations
     table = dataset.table("location:xvtg")
-    allDf = table.to_dataframe(progress=False)
+    allDf = table.to_pandas_dataframe(progress=False)
+    allDf = pd.concat([allDf, new_locations], axis=0)
 
     # Find all locations that should be geocoded
     types = ['latitude', 'longitude']
@@ -668,7 +675,7 @@ def geocode(dataset):
         This function filters our errors and empty cells. 
         """
 
-        if 'error' in cell.lower() or cell == '[]' or cell == 'unknown':
+        if 'error' in cell or cell == '[]' or cell == 'unknown':
             return False
         else:
             return cell
@@ -704,7 +711,6 @@ def geocode(dataset):
 
     # Find all locations that have NOT been geocoded yet
     notGeocoded = [n for n in latLongPairsDf['noticeID'].unique() if n not in geocodedDf['noticeID'].unique()]
-    print(f"Need to geocode {len(notGeocoded)} locations")
 
     #Geocode function
     def geocodeCensus(lat, long, censusYear=2020):
@@ -768,10 +774,13 @@ def geocode(dataset):
         if len(resultsDf) > 0:
             resultsDf['noticeID'] = n
             geocodedDf = pd.concat([geocodedDf, resultsDf], axis=0)
-
         geocodedDf.reset_index(inplace=True, drop=True)
-
-    return geocodedDf
+    
+    if len(geocodedDf) > 0:
+        print(f"Geocoded {len(geocodedDf)} locations.")
+        return geocodedDf
+    else:
+        return []
 
 
 def dataframe_to_csv(df, df_name, directory):

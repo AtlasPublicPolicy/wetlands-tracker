@@ -1,7 +1,7 @@
 # MAIN file
 
 import os
-# import pkg_resources
+import pkg_resources
 import subprocess
 import logging
 import sys
@@ -10,20 +10,20 @@ import sys
 # PREREQUISITE
 ############################
 
-# Import requirements.txt
+#Import requirements.txt
 
-# with open('requirements.txt', encoding='utf-8') as f:
-#     required_modules = [line.strip() for line in f]
+with open('requirements.txt', encoding='utf-8') as f:
+    required_modules = [line.strip() for line in f]
 
-# installed_modules = {pkg.key for pkg in pkg_resources.working_set}
-# missing_modules = set(required_modules) - installed_modules
+installed_modules = {pkg.key for pkg in pkg_resources.working_set}
+missing_modules = set(required_modules) - installed_modules
 
-# if missing_modules:
-#     print(f"Installing missing modules: {', '.join(missing_modules)}")
-#     subprocess.check_call(['pip', 'install'] + list(missing_modules))
-#     print("Installation complete.")
-# else:
-#     print("All required modules are already installed.")
+if missing_modules:
+    print(f"Installing missing modules: {', '.join(missing_modules)}")
+    subprocess.check_call(['pip', 'install'] + list(missing_modules))
+    print("Installation complete.")
+else:
+    print("All required modules are already installed.")
 
     
 # Load external modules
@@ -67,7 +67,7 @@ class configuration:
         self.n_days = 60
 
         ## 3) How many maximum notices (sorted by date) to download?
-        self.max_notices = 2
+        self.max_notices = 20
         
         ## 4）which district you would like to scrape: "New Orleans", "Galveston", "Jacksonville", "Mobile", or "all"; default as "all"
         self.district = "all"
@@ -77,7 +77,7 @@ class configuration:
         self.tbl_to_upload = "all"
         
         ## 6) For Azure summarization, please set a price cap
-        self.price_cap = 25
+        self.price_cap = 5
         
         ## 7) How many sentences you would like to have for summarization
         self.n_sentences = 4
@@ -200,8 +200,11 @@ def main(config):
             print("Skipping embedings")
 
         ### F. Geocoding
-        geocode_tbl = main_extractor.geocode(config.redivis_dataset)
-        main_tbls.update({"geocoded_df": geocode_tbl})
+        geocode_tbl = main_extractor.geocode(config.redivis_dataset, main_tbls['location_df'])
+        if len(geocode_tbl) > 0:
+            main_tbls.update({"geocoded_df": geocode_tbl})
+        else:
+            print("Not locations to geocode")
 
         ## Export tables to directory
         [main_extractor.dataframe_to_csv(main_tbls[df_name], df_name, config.directory) for df_name in main_tbls]
