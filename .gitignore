@@ -2,6 +2,7 @@
 *.txt
 *.md
 *.png
+!workflow.png
 *.sh
 
 #redivis upload csvs
