@@ -9,7 +9,7 @@ import scrape_pdf
 import ast
 import os
 import tiktoken
-import redivis
+# import redivis
 import sys
 import time
 from tqdm import tqdm
@@ -26,6 +26,7 @@ from llmFunctions import openAIfunc_wetland, openAIfunc_project, openai_embed, d
 import pathlib
 import os
 import logging
+import boto3
 
 #set temp directory
 # temp_path = r'tempdir/'
@@ -34,7 +35,7 @@ import logging
 
 # Run the process that exports to the temp dir
 
-def restart_or_update(redivis_dataset, update, n_days, max_notices, logging, district = "all", tesseract_path = None):
+def restart_or_update(aws_client, update, n_days, max_notices, logging, district = "all", tesseract_path = None): # redivis_dataset
     """
     Generate the main scraping results
     
@@ -56,9 +57,17 @@ def restart_or_update(redivis_dataset, update, n_days, max_notices, logging, dis
         # A. Get current version of data from Redivis
         
         # ## Set up the reference to Redivis and get as df
-        scraped_notices = redivis_dataset.table("main_notices").to_pandas_dataframe(variables = ["noticeID", "usaceWebUrl", "datePublished"],
-                                                                                    progress=False)
-        print(f"The number of notices found on Redivis main table is {len(scraped_notices)}")
+        # scraped_notices = redivis_dataset.table("main_notices").to_pandas_dataframe(variables = ["noticeID", "usaceWebUrl", "datePublished"],
+                                                                                    # progress=False)
+        
+        # ## Set up the reference to AWS S3
+        response = aws_client.get_object(Bucket = "usace-notices",
+                                         Key = "dashboard-data/main_df.csv")
+
+        content = response['Body'].read()
+        scraped_notices = pd.read_csv(io.BytesIO(content))
+        
+        print(f"The number of notices found on the existing main table is {len(scraped_notices)}")
         scraped_notices_list = scraped_notices["usaceWebUrl"].to_list()
             
         ## option 2-download csv from redivis to dir
@@ -79,7 +88,7 @@ def restart_or_update(redivis_dataset, update, n_days, max_notices, logging, dis
         # C. Subset the most recent notices to only those that are not in database already
         weblist = weblist_ndays[~weblist_ndays["usaceWebUrl"].isin(scraped_notices_list)]
         #PRINT NEW NOTICES
-        print(f'Notices published in date range not found in Redivis = {len(weblist)}')
+        print(f'Notices published in date range not found in S3 bucket = {len(weblist)}')
         
         # D. Check if the there are more notices updated in the past n days than the maxmium notices set in the configuration
         if len(weblist) > max_notices:
@@ -121,7 +130,7 @@ def restart_or_update(redivis_dataset, update, n_days, max_notices, logging, dis
 
 
 
-def data_schema_preprocess(df_base, redivis_dataset, GPT_MODEL):
+def data_schema_preprocess(df_base, aws_client, GPT_MODEL): # redivis_dataset
     """
     Proprocess the raw scraping data: remove all unknowns and generate noticeID
     """
@@ -135,10 +144,15 @@ def data_schema_preprocess(df_base, redivis_dataset, GPT_MODEL):
     ## C. Create the primary key column noticeID
     
     ### get all the noticeID in Redivis
-    scraped_notices = redivis_dataset.table("main_notices").to_pandas_dataframe(variables = ["noticeID", "usaceWebUrl", "datePublished"],
-                                                                                progress=False)
-    # scraped_notices = pd.read_csv(r'data_schema/main_df_2023_11_20.csv')
-    # scraped_notices = scraped_notices[["noticeID", "usaceWebUrl", "datePublished"]] 
+    # scraped_notices = redivis_dataset.table("main_notices").to_pandas_dataframe(variables = ["noticeID", "usaceWebUrl", "datePublished"],
+                                                                                # progress=False)    
+        
+    ### get all the noticeID in AWS S3 main_df
+    response = aws_client.get_object(Bucket = "usace-notices",
+                                     Key = "dashboard-data/main_df.csv")
+
+    content = response['Body'].read()
+    scraped_notices = pd.read_csv(io.BytesIO(content))
 
     ### find the most latest noticeID
     noticeID_start_on = max([int(re.sub(r'Notice_NO_', "", id_num)) for id_num in scraped_notices["noticeID"]]) + 1
@@ -169,7 +183,7 @@ def data_schema_preprocess(df_base, redivis_dataset, GPT_MODEL):
 #Global variable for the 3 Azure/OpenAI functions
 batch_size = 10
 
-def data_schema_summarization(df, price_cap, AZURE_ENDPOINT, AZURE_API_KEY, redivis_dataset, n_sentences, logging):
+def data_schema_summarization(df, price_cap, AZURE_ENDPOINT, AZURE_API_KEY, aws_client, n_sentences, logging): #redivis_dataset
     """
     # Pricing - https://azure.microsoft.com/en-us/pricing/details/cognitive-services/language-service/
     # $2 for 1000 text records - 1000 character units
@@ -181,10 +195,15 @@ def data_schema_summarization(df, price_cap, AZURE_ENDPOINT, AZURE_API_KEY, redi
     fulltext_df = df[['noticeID' ,'pdf_full_text', 'pdf_trimmed']].copy()
     fulltext_df = fulltext_df[~(fulltext_df.pdf_full_text=="unknown")].copy()
 
-    # Redivis table
-    fulltext_df_redivis = redivis_dataset.table("fulltext").to_pandas_dataframe(variables = ["rowID"], progress=False)
-    #create primary key - rowID
-    fulltext_df['rowID'] = fulltext_df.reset_index().index + fulltext_df_redivis.shape[0] + 1
+    # Create rowID (Redivis ver)
+    # fulltext_df_redivis = redivis_dataset.table("fulltext").to_pandas_dataframe(variables = ["rowID"], progress=False)
+    # fulltext_df['rowID'] = fulltext_df.reset_index().index + fulltext_df_redivis.shape[0] + 1
+    
+    # Create rowID (AWS ver)
+    response = aws_client.get_object(Bucket = "usace-notices", Key = "dashboard-data/fulltext_df.csv")
+    content = response['Body'].read()
+    fulltext_existing_row = len(pd.read_csv(io.BytesIO(content)))
+    fulltext_df['rowID'] = fulltext_df.reset_index().index + fulltext_existing_row + 1
     
     # Initialize an empty DataFrame to hold the summaries
     summary_df = pd.DataFrame()
@@ -247,7 +266,7 @@ def data_schema_summarization(df, price_cap, AZURE_ENDPOINT, AZURE_API_KEY, redi
     
     
         
-def data_schema_impact(df, GPT_MODEL_SET, OPENAI_API_KEY, redivis_dataset, logging):
+def data_schema_impact(df, GPT_MODEL_SET, OPENAI_API_KEY, aws_client, logging): #redivis_dataset
     """
     Apply LLM to extract the information about the impacts on wetlands
     """
@@ -365,9 +384,15 @@ def data_schema_impact(df, GPT_MODEL_SET, OPENAI_API_KEY, redivis_dataset, loggi
                 (wetland_final_df.impact_unit == "unknown") &
                 wetland_final_df.impact_quantity.isna())]
 
-    # Generate row ID
-    wetland_impact_df_redivis = redivis_dataset.table("wetland_impact").to_pandas_dataframe(variables = ["rowID"], progress=False)
-    wetland_final_df['rowID'] = wetland_final_df.reset_index().index + wetland_impact_df_redivis.shape[0] + 1
+    # Generate rowID (Redivis ver)
+    # wetland_impact_df_redivis = redivis_dataset.table("wetland_impact").to_pandas_dataframe(variables = ["rowID"], progress=False)
+    # wetland_final_df['rowID'] = wetland_final_df.reset_index().index + wetland_impact_df_redivis.shape[0] + 1
+    
+    # Create rowID (AWS ver)
+    response = aws_client.get_object(Bucket = "usace-notices", Key = "dashboard-data/wetland_final_df.csv")
+    content = response['Body'].read()
+    wetland_existing_row = len(pd.read_csv(io.BytesIO(content)))
+    wetland_final_df['rowID'] = wetland_final_df.reset_index().index + wetland_existing_row + 1
 
     del wetland_df
     
@@ -377,7 +402,7 @@ def data_schema_impact(df, GPT_MODEL_SET, OPENAI_API_KEY, redivis_dataset, loggi
 
 
 
-def data_schema_embeding(df, GPT_MODEL_SET, OPENAI_API_KEY, redivis_dataset, logging):
+def data_schema_embeding(df, GPT_MODEL_SET, OPENAI_API_KEY, aws_client, logging): #redivis_dataset
     """
     Generate the project type and embedding table 
     """
@@ -424,14 +449,22 @@ def data_schema_embeding(df, GPT_MODEL_SET, OPENAI_API_KEY, redivis_dataset, log
 
     # Concatenate all processed batches into the final DataFrame
     embed_final_df = pd.concat(processed_batches, ignore_index=True)
+    
+    # print(embed_final_df.columns)
 
     # Replace NAs to 'unknown'
     embed_final_df = embed_final_df.replace("", "unknown")
     embed_final_df[["pdf_character", "project_detail", "total_project_area", "project_category"]] = embed_final_df[["pdf_character", "project_detail", "total_project_area", "project_category"]].fillna('unknown', inplace=False)
 
-    # Generate row ID
-    embed_df_redivis = redivis_dataset.table("embed_project_type").to_pandas_dataframe(variables = ["rowID"], progress=False)
-    embed_final_df['rowID'] = embed_final_df.index + embed_df_redivis.shape[0] + 1
+    # Generate ID (Redivis Ver)
+    # embed_df_redivis = redivis_dataset.table("embed_project_type").to_pandas_dataframe(variables = ["rowID"], progress=False)
+    # embed_final_df['rowID'] = embed_final_df.index + embed_df_redivis.shape[0] + 1
+    
+    # Create rowID (AWS ver)
+    response = aws_client.get_object(Bucket = "usace-notices", Key = "dashboard-data/embed_final_df.csv")
+    content = response['Body'].read()
+    embed_existing_row = len(pd.read_csv(io.BytesIO(content)))
+    embed_final_df['rowID'] = embed_final_df.reset_index().index + embed_existing_row + 1
 
     del embed_df
 
@@ -447,7 +480,6 @@ def clean_special_characters(df, columns, ascii_threshold=127):
     """
     Replace special characters and non-printable characters
     """
-    print('Cleaning special characters...')
     
     # Initialize set for special characters
     special_chars = set()
@@ -490,7 +522,7 @@ def clean_special_characters(df, columns, ascii_threshold=127):
 
 
 
-def data_schema(df, aws_access_key_id, aws_secret_access_key, redivis_dataset):
+def data_schema(df, aws_client): # redivis_dataset
     """
     Process the base dataframe to several tables stored in Redivis database
     """
@@ -501,11 +533,10 @@ def data_schema(df, aws_access_key_id, aws_secret_access_key, redivis_dataset):
     # (1) Store PDFs to AWS
     
     # Place pdf to AWS S3 bucket and generate a table with notice id and aws link
-    aws_df = pd.DataFrame([scrape_pdf.pdf_to_aws(aws_access_key_id, 
-                                             aws_secret_access_key, 
-                                             df.loc[index, "usaceWebUrl"],
-                                             df.loc[index, "PdfUrl"], 
-                                             df.loc[index, "noticeID"]) for index in df.index])
+    aws_df = pd.DataFrame([scrape_pdf.pdf_to_aws(aws_client,
+                                                 df.loc[index, "usaceWebUrl"],
+                                                 df.loc[index, "PdfUrl"], 
+                                                 df.loc[index, "noticeID"]) for index in df.index])
     
     # (2) Main table
     
@@ -563,13 +594,18 @@ def data_schema(df, aws_access_key_id, aws_secret_access_key, redivis_dataset):
                               (manager_df['phone'] == 'unknown') & 
                               (manager_df['email'] == 'unknown'))].copy()
     
-    # Redivis table reference
-    manager_df_redivis = redivis_dataset.table("manager").to_pandas_dataframe(variables = ["rowID"], progress=False)
-    #create rowID
-    manager_df['rowID'] = manager_df.reset_index().index + manager_df_redivis.shape[0] + 1
-
+    # Create rowID (Redivis ver)
+    # manager_df_redivis = redivis_dataset.table("manager").to_pandas_dataframe(variables = ["rowID"], progress=False)
+    # manager_df['rowID'] = manager_df.reset_index().index + manager_df_redivis.shape[0] + 1
     
-
+    # Create rowID (AWS ver)
+    response = aws_client.get_object(Bucket = "usace-notices", Key = "dashboard-data/manager_df.csv")
+    content = response['Body'].read()
+    manager_existing_row = len(pd.read_csv(io.BytesIO(content)))
+    manager_df['rowID'] = manager_df.reset_index().index + manager_existing_row + 1
+    
+    
+    
     # (4) Character of work / proposed work
     
     character_df = df[['noticeID' , 'web_character', 'pdf_character']].copy() 
@@ -582,11 +618,16 @@ def data_schema(df, aws_access_key_id, aws_secret_access_key, redivis_dataset):
 
     character_df = character_df[~(character_df.text=="unknown")].copy()
 
-    # Redivis table reference
-    character_df_redivis = redivis_dataset.table("character").to_pandas_dataframe(variables = ["rowID"], progress=False)
-    # Create rowID
-    character_df['rowID'] = character_df.reset_index().index + character_df_redivis.shape[0] + 1
-
+    # Create rowID (Redivis ver)
+    # character_df_redivis = redivis_dataset.table("character").to_pandas_dataframe(variables = ["rowID"], progress=False)
+    # character_df['rowID'] = character_df.reset_index().index + character_df_redivis.shape[0] + 1
+    
+    # Create rowID (AWS ver)
+    response = aws_client.get_object(Bucket = "usace-notices", Key = "dashboard-data/character_df.csv")
+    content = response['Body'].read()
+    character_existing_row = len(pd.read_csv(io.BytesIO(content)))
+    character_df['rowID'] = character_df.reset_index().index + character_existing_row + 1
+    
     
     
     # (5) Mitigation
@@ -601,10 +642,15 @@ def data_schema(df, aws_access_key_id, aws_secret_access_key, redivis_dataset):
 
     mitigation_df = mitigation_df[~(mitigation_df.text=="unknown")].copy()
 
-    # Redivis table reference
-    mitigation_df_redivis = redivis_dataset.table("mitigation").to_pandas_dataframe(variables = ["rowID"], progress=False)
-    #create rowID
-    mitigation_df['rowID'] = mitigation_df.reset_index().index + mitigation_df_redivis.shape[0] + 1
+    # Create rowID (Redivis ver)
+    # mitigation_df_redivis = redivis_dataset.table("mitigation").to_pandas_dataframe(variables = ["rowID"], progress=False)
+    # mitigation_df['rowID'] = mitigation_df.reset_index().index + mitigation_df_redivis.shape[0] + 1
+    
+    # Create rowID (AWS ver)
+    response = aws_client.get_object(Bucket = "usace-notices", Key = "dashboard-data/mitigation_df.csv")
+    content = response['Body'].read()
+    mitigation_existing_row = len(pd.read_csv(io.BytesIO(content)))
+    mitigation_df['rowID'] = mitigation_df.reset_index().index + mitigation_existing_row + 1
 
 
     
@@ -622,10 +668,15 @@ def data_schema(df, aws_access_key_id, aws_secret_access_key, redivis_dataset):
 
     location_df = location_df[~(location_df.detail=="unknown")].copy()
 
-    # Redivis table
-    location_df_redivis = redivis_dataset.table("location").to_pandas_dataframe(variables = ["rowID"], progress=False)
-    #create rowID
-    location_df['rowID'] = location_df.reset_index().index + location_df_redivis.shape[0] + 1
+    # Create rowID (Redivis ver)
+    # location_df_redivis = redivis_dataset.table("location").to_pandas_dataframe(variables = ["rowID"], progress=False)
+    # location_df['rowID'] = location_df.reset_index().index + location_df_redivis.shape[0] + 1
+    
+    # Create rowID (AWS ver)
+    response = aws_client.get_object(Bucket = "usace-notices", Key = "dashboard-data/location_df.csv")
+    content = response['Body'].read()
+    location_existing_row = len(pd.read_csv(io.BytesIO(content)))
+    location_df['rowID'] = location_df.reset_index().index + location_existing_row + 1
 
     location_df['type'] = location_df['type'].str.split('_').str[-1]
       
@@ -651,20 +702,37 @@ def data_schema(df, aws_access_key_id, aws_secret_access_key, redivis_dataset):
             # "validation_df":validation_df
     }
 
-def geocode(dataset, new_locations):
+def geocode(aws_client, new_locations): #dataset
     """
     This function looks for lat/longs that have yet to be geocoded (not just for new new notices but all notices). 
     It then geocodes them and returns it as a dataframe.
     """
-    #Load needed tables
+    #Load needed tables (Redivis)
     ## Geocoded Locations
-    table = dataset.table("geocoded_locations:9jz4")
-    geocodedDf = table.to_pandas_dataframe(progress=False)
+    # table = dataset.table("geocoded_locations:9jz4")
+    # geocodedDf = table.to_pandas_dataframe(progress=False)
 
     ## All Locations
-    table = dataset.table("location:xvtg")
-    allDf = table.to_pandas_dataframe(progress=False)
+    # table = dataset.table("location:xvtg")
+    # allDf = table.to_pandas_dataframe(progress=False)
+    # allDf = pd.concat([allDf, new_locations], axis=0)
+    
+    #Load needed tables (AWS)
+    ## Geocoded Locations
+    response = aws_client.get_object(Bucket = "usace-notices",
+                                     Key = "dashboard-data/geocoded_df.csv")
+
+    content = response['Body'].read()
+    geocodedDf = pd.read_csv(io.BytesIO(content))
+    
+    ## All Locations
+    response = aws_client.get_object(Bucket = "usace-notices",
+                                     Key = "dashboard-data/location_df.csv")
+
+    content = response['Body'].read()
+    allDf = pd.read_csv(io.BytesIO(content))
     allDf = pd.concat([allDf, new_locations], axis=0)
+    
 
     # Find all locations that should be geocoded
     types = ['latitude', 'longitude']
@@ -743,7 +811,7 @@ def geocode(dataset, new_locations):
 
     geocodedDf = pd.DataFrame([])
     for n in notGeocoded:
-        resultsDf = []
+        resultsDf = pd.DataFrame()
         lat = latLongPairsDf[latLongPairsDf['noticeID'] == n]['latitude'].values[0]
         long = latLongPairsDf[latLongPairsDf['noticeID'] == n]['longitude'].values[0]
         if long > 0:
@@ -872,3 +940,53 @@ def upload_redivis(tbl_to_upload, redivis_dataset, directory, overwrite_redivis 
         except Exception as e:
             print(f"Error with uploading {filepath} to {table.name}: {e}")
 
+            
+            
+            
+def upload_aws(main_tbls, tbl_to_upload, aws_client):
+    """
+    Upload tables to AWS S3 bucket;
+    main_tbls: a dictionary of dataframes
+    tbl_to_upload: "all", "none", or a list such as ["main_df", "manager_df", "location_df", "character_df", "mitigation_df", "fulltext_df", "summary_df", "wetland_final_df", "embed_final_df", "validation_df", "aws_df", "geocoded_df"]
+    """
+    
+    # Get a list of uploading files
+    if tbl_to_upload.lower() == "all": 
+        # tbl_list = list(main_tbls.items())
+        tbl_dict = main_tbls
+        print('Starting upload all tabls to the bucket...')
+    elif tbl_to_upload.lower() == "none":
+        print("Do not upload any tables to the bucket")
+        return
+    else:
+        # tbl_list = [main_tbls[tbl_name] for tbl_name in list(main_tbls.keys()) if tbl_name in tbl_to_upload] 
+        tbl_dict = {tbl_name: main_tbls[tbl_name] for tbl_name in list(main_tbls.keys()) if tbl_name in tbl_to_upload}
+        print('Starting upload selected tables to the bucket...')
+    
+    for tbl_name, tbl in tbl_dict.items():
+        
+        # Pull existing data in AWS
+        try:
+            response = aws_client.get_object(Bucket = "usace-notices",
+                                             Key = f"dashboard-data/{tbl_name}.csv")
+        
+            content = response['Body'].read()
+            existing_df = pd.read_csv(io.BytesIO(content))
+        except:
+            existing_df = pd.DataFrame()
+            
+        # Append data
+        upload_df = pd.concat([existing_df, tbl], ignore_index=True)
+        
+        # Convert DataFrame to bytes
+        csv_buffer = io.BytesIO()
+        upload_df.to_csv(csv_buffer, index=False)
+        upload_bytes = csv_buffer.getvalue()
+        
+        aws_client.put_object(
+            Body = upload_bytes, 
+            Bucket = "usace-notices", 
+            Key = f'dashboard-data/{tbl_name}.csv', 
+            ACL = "public-read")
+        
+        print(f"{tbl_name} was successfully uploaded")

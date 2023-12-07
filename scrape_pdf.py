@@ -1503,7 +1503,7 @@ def pdf_extraction(pdf_url, web_text, web_title, tesseract_path=None):
 
 
     
-def pdf_to_aws(aws_access_key_id, aws_secret_access_key, web_url, pdf_url, notice_id):
+def pdf_to_aws(aws_client, web_url, pdf_url, notice_id):
     
     # Download PDFs
     try:
@@ -1559,13 +1559,13 @@ def pdf_to_aws(aws_access_key_id, aws_secret_access_key, web_url, pdf_url, notic
             pdf_bytes = "ERROR"
 
     # Set up the id and key
-    client = boto3.client(
-        's3',
-        aws_access_key_id = aws_access_key_id,
-        aws_secret_access_key = aws_secret_access_key)
+    # aws_client = boto3.client(
+    #     's3',
+    #     aws_access_key_id = aws_access_key_id,
+    #     aws_secret_access_key = aws_secret_access_key)
     
     if pdf_bytes != "ERROR":
-        client.put_object(
+        aws_client.put_object(
             Body = pdf_bytes, 
             Bucket = "usace-notices", 
             Key = "full-pdf/" + notice_id + '.pdf', 

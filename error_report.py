@@ -21,13 +21,15 @@ from IPython.display import Markdown
 
 
 
-def error_report(directory):
+def error_report(raw_df, val_df): # directory
 
-    # Read in tables 
-    raw_df = pd.read_csv(f"{directory}raw_df.csv")
-    # raw_df = raw_df.drop(columns = ["pdf_full_text", "pdf_trimmed"])
-    val_df = pd.read_csv(glob.glob(f"{directory}validation_*")[0])
-    wetland_df = pd.read_csv(glob.glob(f"{directory}wetland_*")[0])
+    # Redivis solution: need to read in tables from directory 
+    # raw_df = pd.read_csv(f"{directory}raw_df.csv")
+    # val_df = pd.read_csv(glob.glob(f"{directory}validation_*")[0])
+    
+    # AWS solution: need to convert 'wetland_llm_dict' and 'pdf_impact' to string
+    val_df['wetland_llm_dict'] = val_df['wetland_llm_dict'].astype(str)
+    val_df['pdf_impact'] = val_df['pdf_impact'].astype(str)
     
     ####################
     markdown_content = f"# 1: Check the results pulled by regex\n\n"

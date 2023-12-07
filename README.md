@@ -32,6 +32,10 @@ The U.S. Army Corps of Engineers (USACE) evaluates permit applications for any w
      ```
      source venv/bin/activate
      ```
+* Set up an AWS S3 bucket:
+   * A folder to place the scrapped data: __dashboard-data__
+   * A folder to place notice PDFs: __full-pdf__ <br>
+   __NOTE:__ If you do not want to use AWS S3 bucket, you may uncomment the 8th parameter in the configuration `self.directory = "data_schema/"` and the function to export tables to your directory in the main() `[main_extractor.dataframe_to_csv(main_tbls[df_name], df_name, config.directory) for df_name in main_tbls]` to store data locally.
 
 ### Usage
 __In an active virtual environment__

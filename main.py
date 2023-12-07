@@ -31,8 +31,9 @@ import glob
 import pandas as pd
 from dotenv import load_dotenv
 import main_extractor
-import redivis
+# import redivis
 from error_report import error_report
+import boto3
 
 # Configuration: set up parameters and API keys
 
@@ -47,8 +48,8 @@ class configuration:
         self.AZURE_API_KEY = os.environ.get('AZURE_API_KEY')
 
         # Redivis
-        self.REDIVIS_API_KEY = os.environ.get('REDIVIS_API_KEY')
-        self.redivis_dataset = redivis.user("portugalmo").dataset("usaceData", version = "next")
+        # self.REDIVIS_API_KEY = os.environ.get('REDIVIS_API_KEY')
+        # self.redivis_dataset = redivis.user("portugalmo").dataset("usaceData", version = "next")
 
         # openAI
         self.OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
@@ -64,7 +65,7 @@ class configuration:
         self.update = 1
         
         ## 2）How many days in the past you would like search for updated notices: numeric # from 0 to 500; default as 100
-        self.n_days = 60
+        self.n_days = 14
 
         ## 3) How many maximum notices (sorted by date) to download?
         self.max_notices = 20
@@ -73,7 +74,7 @@ class configuration:
         self.district = "all"
 
         ## 5) which table you would like to upload to Redivis?
-        ## Any of tables in the list = ["main", "manager", "character", "mitigation", "location", "fulltext", "summary", "wetland", "embed", "validation", "aws", "geocoded"], "none" or "all"; defaul as "none"
+        ## Any of tables in the list = ["main_df", "manager_df", "location_df", "character_df", "mitigation_df", "fulltext_df", "summary_df", "wetland_final_df", "embed_final_df", "validation_df", "aws_df", "geocoded_df"], "none" or "all"; defaul as "all"
         self.tbl_to_upload = "all"
         
         ## 6) For Azure summarization, please set a price cap
@@ -83,10 +84,10 @@ class configuration:
         self.n_sentences = 4
         
         ## 8) file directory
-        self.directory = "data_schema/"
+        # self.directory = "data_schema/"
 
         ## 9) Overwrite file with same name on Redivis
-        self.overwrite_redivis = 0
+        # self.overwrite_redivis = 0
 
         ## 10) Skip paid services including OpenAI and Azure Summaries. 1, skip; 0, do not skip; default = 0
         self.skipPaid = 0
@@ -119,40 +120,43 @@ def main(config):
         level=logging.INFO)
     
     # Create the directory data_schema when it does not exist 
-    if not os.path.exists(config.directory):
-        os.makedirs(config.directory)
+    # if not os.path.exists(config.directory):
+        # os.makedirs(config.directory)
     
     try:
         ## Connect to Redivis DB:
-        os.environ['REDIVIS_API_TOKEN'] = config.REDIVIS_API_KEY
+        # os.environ['REDIVIS_API_TOKEN'] = config.REDIVIS_API_KEY
+        
+        ## Connect to AWS S3 bucket
+        aws_client = boto3.client('s3',
+                                   aws_access_key_id = config.aws_access_key_id,
+                                   aws_secret_access_key = config.aws_secret_access_key)
 
-        ## If update == 0: scrape all historical notices
-        ## If update == 1: Check latest notices for selected days; For those have not been in Redivis DB, scrape webpage and pdf
-        df_base = main_extractor.restart_or_update(config.redivis_dataset,
+        ## scrape all historical notices or check latest notices for selected days; For those have not been in AWS bucket, scrape webpage and pdf
+        df_base = main_extractor.restart_or_update(aws_client,
                                                    config.update, 
                                                    config.n_days, 
                                                    config.max_notices,
                                                    logging,
                                                    config.district,
                                                    config.tesseract_path
-                                                   )
+                                                  )
 
-        # EXPORT RAW_DF AT THIS STAGE - EXCLUDE FULL_TEXT COLUMN
-        raw_df = df_base.drop(columns=['pdf_full_text', 'pdf_trimmed'])
-        raw_df.to_csv(f'{config.directory}raw_df.csv', index=False)
+        # EXPORT RAW_DF AT THIS STAGE 
+        # raw_df = df_base.drop(columns=['pdf_full_text', 'pdf_trimmed'])
+        # raw_df.to_csv(f'{config.directory}raw_df.csv', index=False)
         
         ## Pre-clean
         df = main_extractor.data_schema_preprocess(df_base, 
-                                                   config.redivis_dataset,
-                                                   config.GPT_MODEL_SET)
+                                                   aws_client,
+                                                   config.GPT_MODEL_SET
+                                                  )
 
         ## Clean/Validation
 
         ### A. main, manager, character of work, mitigation, location, and aws links
         main_tbls = main_extractor.data_schema(df, 
-                                               config.aws_access_key_id, 
-                                               config.aws_secret_access_key,
-                                               config.redivis_dataset)
+                                               aws_client)
 
         ### B. Azure summarization
         if config.skipPaid == 0:
@@ -160,7 +164,7 @@ def main(config):
                                                                                 config.price_cap, 
                                                                                 config.AZURE_ENDPOINT, 
                                                                                 config.AZURE_API_KEY, 
-                                                                                config.redivis_dataset,
+                                                                                aws_client,
                                                                                 config.n_sentences,
                                                                                 logging)
             main_tbls.update(fulltext_and_summary_tbl)
@@ -172,7 +176,7 @@ def main(config):
             impact_tbl = main_extractor.data_schema_impact(df, 
                                                            config.GPT_MODEL_SET,
                                                            config.OPENAI_API_KEY,
-                                                           config.redivis_dataset,
+                                                           aws_client,
                                                            logging)
             main_tbls.update({"wetland_final_df":impact_tbl["wetland_final_df"]})
         else:
@@ -193,27 +197,30 @@ def main(config):
             embeding_tbl = main_extractor.data_schema_embeding(df, 
                                                                config.GPT_MODEL_SET,
                                                                config.OPENAI_API_KEY,
-                                                               config.redivis_dataset,
+                                                               aws_client,
                                                                logging)
             main_tbls.update(embeding_tbl)
         else:
             print("Skipping embedings")
 
         ### F. Geocoding
-        geocode_tbl = main_extractor.geocode(config.redivis_dataset, main_tbls['location_df'])
+        geocode_tbl = main_extractor.geocode(aws_client, main_tbls['location_df'])
         if len(geocode_tbl) > 0:
             main_tbls.update({"geocoded_df": geocode_tbl})
         else:
             print("Not locations to geocode")
 
         ## Export tables to directory
-        [main_extractor.dataframe_to_csv(main_tbls[df_name], df_name, config.directory) for df_name in main_tbls]
+        # [main_extractor.dataframe_to_csv(main_tbls[df_name], df_name, config.directory) for df_name in main_tbls]
 
         ## Upload to Redivis DB
-        main_extractor.upload_redivis(config.tbl_to_upload, config.redivis_dataset, config.directory, config.overwrite_redivis)
+        # main_extractor.upload_redivis(config.tbl_to_upload, config.redivis_dataset, config.directory, config.overwrite_redivis)
+        
+        ## Upload to AWS S3 bucket
+        main_extractor.upload_aws(main_tbls, config.tbl_to_upload, aws_client)
         
         ## Error report
-        markdown_content = error_report(config.directory)
+        markdown_content = error_report(df_base, validation_df)
 
         with open("error_report.md", "w", encoding="utf-8") as f:
             f.write(markdown_content)
