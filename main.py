@@ -11,7 +11,7 @@ import sys
 ############################
 
 #Import requirements.txt
-
+"""
 with open('requirements.txt', encoding='utf-8') as f:
     required_modules = [line.strip() for line in f]
 
@@ -24,8 +24,8 @@ if missing_modules:
     print("Installation complete.")
 else:
     print("All required modules are already installed.")
+"""    
 
-    
 # Load external modules
 import glob
 import pandas as pd
