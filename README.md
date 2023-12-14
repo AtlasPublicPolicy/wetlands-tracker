@@ -88,10 +88,7 @@ __In an active virtual environment__
 * __error_report.md__: This file captures the potential problems with the PDF reading process, special notices, Regex patterns, and LLM performance, which will not break the running and will not be reported in log.txt.
 
 ### Contributing
-Guidelines for contributing to the project, including how to submit pull requests, report issues, or add features.
-
-### License
-Information about the project's license.
+Users are encouraged to report issues directly in the GitHub repository. We plan to maintain this repository at-least through 2024. While we welcome pull requests, we cannot guarantee that they will be reviewed or accepted in a timely manner.
 
 ### Contact
-Details for reaching out to the project maintainers or contributors.
+Please reach out to us at info@atlaspolicy.com with any questions or comments.
