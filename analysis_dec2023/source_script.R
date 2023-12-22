@@ -8,7 +8,12 @@ packages_required <-
     "tidycensus", 
     "aws.s3",
     "dotenv",
-    "sf")
+    "sf",
+    "lubridate",
+    "patchwork",
+    "tigris",
+    "ggspatial",
+    "gganimate")
 
 for (package in packages_required) {
   if (!requireNamespace(package, quietly = TRUE)) {
@@ -71,7 +76,8 @@ notice <-
                    .x))
       
       # Convert the byte object into df
-      read.csv(text = rawToChar(tbl_bytes))
+      read.csv(text = rawToChar(tbl_bytes)) %>% 
+        as_tibble()
       }
     ) %>%
   

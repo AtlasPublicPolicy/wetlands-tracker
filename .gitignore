@@ -1,5 +1,6 @@
 #log files
 *.txt
+!error_counting.txt
 *.md
 *.png
 !workflow.png
@@ -173,3 +174,4 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 *.Rproj.user/
+.Rproj.user

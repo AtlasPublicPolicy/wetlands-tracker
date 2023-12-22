@@ -1,0 +1,11 @@
+* Impact quantity in sq ft is recognized as acres
+
+"Notice_NO_4668", 
+"Notice_NO_3363",
+"Notice_NO_1251",
+"Notice_NO_1094", 
+"Notice_NO_3647",
+"Notice_NO_1102", 
+"Notice_NO_1023",
+"Notice_NO_889", 
+"Notice_NO_5543"
