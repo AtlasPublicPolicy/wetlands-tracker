@@ -107,7 +107,7 @@ def restart_or_update(aws_client, update, n_days, max_notices, logging, district
     webpage = pd.DataFrame([scrape_rss_webpage.web_extraction(x, update) for x in weblist["usaceWebUrl"]])
     
     # Merge with weblist table
-    webpage = weblist.reset_index().join(webpage)
+    webpage = weblist.reset_index(drop = True).join(webpage)
     
     # sort by date
     webpage = webpage.sort_values(by='datePublished', ascending=False)
@@ -123,7 +123,7 @@ def restart_or_update(aws_client, update, n_days, max_notices, logging, district
     pdf = pd.DataFrame([scrape_pdf.pdf_extraction(webpage.loc[x, "PdfUrl"], webpage.loc[x, "web_text"], webpage.loc[x, "web_title"], tesseract_path) for x in webpage.index])
 
     # # Merge with weblist and webpage table
-    df_base = webpage.reset_index().join(pdf)
+    df_base = webpage.reset_index(drop = True).join(pdf)
     
     return df_base
 
