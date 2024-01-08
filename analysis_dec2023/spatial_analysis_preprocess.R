@@ -210,17 +210,7 @@ ggplot() +
 # Authenticate  (replace with your credentials or token)
 # link to dataset: https://redivis.com/datasets/jf53-3sapx6pmv/tables/4d46-2t7fab7tf?v=next
 
-
-# Define Dataset-table-SQL query
-sql_query <- "SELECT * FROM 
-`eidc.cejst_datasets:jf53:next.cejst_communities_list_shapefile:4d46`
-WHERE SF IN ('Texas', 'Louisiana', 'Alabama')"
-
-# Convert to dataframe
-data <- redivis::query(sql_query)$to_tibble()
-
-
-cj <- read_csv('D:/Work/Georgetown/acad/mdi/summer_research/bp/CEJST_communities_list_shapefile.csv')
+cj <- read_csv('CEJST_communities_list_shapefile.csv')
 
 # Filter rows where SF is 'Texas'
 cj <- cj %>%  filter( SF %in% c('Texas', 'Alabama', 'Louisiana'))
@@ -228,7 +218,6 @@ cj <- cj %>%  filter( SF %in% c('Texas', 'Alabama', 'Louisiana'))
 ## plot for Alabama, replace with needed state
 cj_al <- cj %>%  filter( SF %in% c('Alabama')) %>%
   st_as_sf(wkt = "geometry", crs = 4326)
-
 
 
 joined_df <- st_join( reshaped_sf, cj_al,
