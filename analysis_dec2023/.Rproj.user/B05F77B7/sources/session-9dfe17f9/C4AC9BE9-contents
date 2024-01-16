@@ -1,0 +1,103 @@
+---
+title: "Wetland tracker data analysis"
+author: "Kumar H (MDI)"
+date: "21 Dec 2023"
+format: revealjs
+editor: visual
+---
+
+## Data Quality
+
+\
+
+Wetland table - "unknown" values
+
+![Barplot of unknowns](pics/p1_unk.png){width="800" height="400"}
+
+## Comment period
+
+-   Median = 23 days
+
+-   Bimodal distribution
+
+![histogram comment pd](pics/p2_hist.png){width="800" height="400"}
+
+\
+
+## Comment period
+
+![Lineplot - comment period](pics/p3_commline.png){width="800" height="500"}
+
+## Notice issuance
+
+![Lineplot - notices](pics/p4_noticesline.PNG){width="800" height="500"}
+
+## Notice issuance
+
+-   Breakpoint: Nov 2020
+
+![Lineplot - notices](pics/p6_brk.png){width="800" height="500"}
+
+## Data quality
+
+Main issues:
+
+-   Double counting
+
+-   Errors/hallucination
+
+-   Missing values
+
+## Area errors
+
+-   **Double counting**
+
+    -   **Original**: "total of 10 acres, incl. 6 acres of forested wetland, 4 acres of PEM"
+
+    -   **Extracted**: \[10 acres, 6 acres, 4 acres\]
+
+## Area errors
+
+-   **Double counting** - Band-aid
+
+    -   **Single wetland = 2577 unique notices**
+
+    -   Multi-wetland = 2583 unique notices
+
+\
+
+## Area errors
+
+-   **Wrong units**
+
+    -   **Original**: "481,234 square foot (10.9 acres)"
+
+    -   **Extracted**: 481234.0 acres\
+
+-   Band-aid: Subset to \<1000 acres first
+
+\
+
+## Silver lining
+
+-   **Original**: "Artificial Reef Main Pass 132 is located approximately 70 miles south of Biloxi. The project is located in Mississippi Sound at the following coordinates: NW: 29.37735/ -88.675 SE: 29.3655/ -88.661667 SW: 29.3655/ -88.675 NE: 29.37735/ -88.661667"
+
+-   **Extracted**: Area = 420 acres
+
+## Impact analyses
+
+Total notices by impact type
+
+![Barplot - impacts](pics/p7_bar_loss.png){width="800" height="500"}
+
+## Impact analyses
+
+Total area by impact type
+
+![stackplot - impacts](pics/p8_stackarea.png){width="800" height="500"}
+
+## Next steps
+
+-   Clean/patch data
+
+-   Fine tune model
