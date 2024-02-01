@@ -731,7 +731,7 @@ def geocode(aws_client, new_locations): #dataset
 
     content = response['Body'].read()
     allDf = pd.read_csv(io.BytesIO(content))
-    allDf = pd.concat([allDf, new_locations], axis=0)
+    allDf = pd.concat([allDf, new_locations], ignore_index=True)
     
 
     # Find all locations that should be geocoded
