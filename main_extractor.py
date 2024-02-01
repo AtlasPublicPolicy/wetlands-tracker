@@ -252,7 +252,7 @@ def data_schema_summarization(df, price_cap, AZURE_ENDPOINT, AZURE_API_KEY, aws_
         except Exception as e:
             error_message = f'Batch {i} failed to process due to: {e}'
             print(error_message)
-            logging.errors(error_message)
+            logging.error(error_message)
 
     # Optional: Drop the "pdf_full_text" column if you no longer need it in the final DataFrame
     summary_df = summary_df.drop(columns=["pdf_full_text", "pdf_trimmed"])
@@ -303,7 +303,7 @@ def data_schema_impact(df, GPT_MODEL_SET, OPENAI_API_KEY, aws_client, logging): 
         except Exception as e:
             error_message = f'Batch {i} failed to process due to: {e}'
             print(error_message)
-            logging.errors(error_message)
+            logging.error(error_message)
 
     ### Concatenate all processed batches to form the final DataFrame
     wetland_impact_df = pd.concat(processed_batches, ignore_index=True)
@@ -445,7 +445,7 @@ def data_schema_embeding(df, GPT_MODEL_SET, OPENAI_API_KEY, aws_client, logging)
         except Exception as e:
             error_message = f'Batch {i} failed to process due to: {e}'
             print(error_message)
-            logging.errors(error_message)
+            logging.error(error_message)
 
     # Concatenate all processed batches into the final DataFrame
     embed_final_df = pd.concat(processed_batches, ignore_index=True)

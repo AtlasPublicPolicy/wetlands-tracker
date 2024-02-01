@@ -68,7 +68,7 @@ class configuration:
         self.n_days = 14
 
         ## 3) How many maximum notices (sorted by date) to download?
-        self.max_notices = 20
+        self.max_notices = 30
         
         ## 4）which district you would like to scrape: "New Orleans", "Galveston", "Jacksonville", "Mobile", or "all"; default as "all"
         self.district = "all"

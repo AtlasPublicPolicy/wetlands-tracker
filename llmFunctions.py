@@ -298,7 +298,6 @@ def openAIfunc_wetland(input_text,  API_KEY, GPT_MODEL):
     chat_response = chat_completion_request(GPT_MODEL,
         messages, API_KEY, functions=main_func, function_call={"name": "wetland_analysis"}
     )
-
     func_response = chat_response.json()["choices"][0]["message"]["function_call"]["arguments"]
 
     # Convert the stringified JSON to a Python dictionary
