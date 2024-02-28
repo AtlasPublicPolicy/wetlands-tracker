@@ -85,15 +85,15 @@ __In an active virtual environment__
 
 ### Data
 All data powering the dashboard is located on an AWS S3 bucket with public read access. Here are the links to the CSVs:
-* [aws_df.csv](https://s3.console.aws.amazon.com/s3/object/usace-notices?region=us-east-1&bucketType=general&prefix=dashboard-data/aws_df.csv)
-* [character_df](https://s3.console.aws.amazon.com/s3/object/usace-notices?region=us-east-1&bucketType=general&prefix=dashboard-data/character_df.csv)
-* [fulltext_df.csv](https://s3.console.aws.amazon.com/s3/object/usace-notices?region=us-east-1&bucketType=general&prefix=dashboard-data/fulltext_df.csv)
-* [geocoded_df.csv](https://s3.console.aws.amazon.com/s3/object/usace-notices?region=us-east-1&bucketType=general&prefix=dashboard-data/geocoded_df.csv)
-* [location_df.csv](https://s3.console.aws.amazon.com/s3/object/usace-notices?region=us-east-1&bucketType=general&prefix=dashboard-data/location_df.csv)
-* [main_df.csv](https://s3.console.aws.amazon.com/s3/object/usace-notices?region=us-east-1&bucketType=general&prefix=dashboard-data/main_df.csv)
-* [manager_df.csv](https://s3.console.aws.amazon.com/s3/object/usace-notices?region=us-east-1&bucketType=general&prefix=dashboard-data/manager_df.csv)
-* [mitigation_df.csv](https://s3.console.aws.amazon.com/s3/object/usace-notices?region=us-east-1&bucketType=general&prefix=dashboard-data/mitigation_df.csv)
-* [summary_df.csv](https://s3.console.aws.amazon.com/s3/object/usace-notices?region=us-east-1&bucketType=general&prefix=dashboard-data/summary_df.csv)
+* [aws_df.csv](https://usace-notices.s3.amazonaws.com/dashboard-data/aws_df.csv)
+* [character_df.csv](https://usace-notices.s3.amazonaws.com/dashboard-data/character_df.csv)
+* [fulltext_df.csv](https://usace-notices.s3.amazonaws.com/dashboard-data/fulltext_df.csv)
+* [geocoded_df.csv](https://usace-notices.s3.amazonaws.com/dashboard-data/geocoded_df.csv)
+* [location_df.csv](https://usace-notices.s3.amazonaws.com/dashboard-data/location_df.csv)
+* [main_df.csv](https://usace-notices.s3.amazonaws.com/dashboard-data/main_df.csv)
+* [manager_df.csv](https://usace-notices.s3.amazonaws.com/dashboard-data/manager_df.csv)
+* [mitigation_df.csv](https://usace-notices.s3.amazonaws.com/dashboard-data/mitigation_df.csv)
+* [summary_df.csv](https://usace-notices.s3.amazonaws.com/dashboard-data/summary_df.csv)
 
 ### Troubleshooting
 * __log.txt__: You can find messages, warnings, and errors here.
