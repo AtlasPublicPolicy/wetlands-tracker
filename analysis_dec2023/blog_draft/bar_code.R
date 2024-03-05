@@ -65,7 +65,7 @@ p1 <- ggplot(data = df, aes(x = disadv, y = count, fill = disadv)) +
 
 ggsave("images/barplot_counts.png", plot = p1, dpi = 300)  # Adjust dpi as needed
 
-##################### plot 2
+##################### plot 2 - barplot of avg. acreage #########3
 
 p2 <- ggplot(data = df, aes(x = disadv, y = count, fill = disadv)) +
   # Add bar for total projects with specified color, ensuring `disadv` is used as factor
@@ -112,7 +112,7 @@ ggsave("images/barplot_acres.png", plot = p2, dpi = 300)  # Adjust dpi as needed
 ##################################################
 
 
-## plot 3 - time series plot
+## plot 3 - time series plot of notices
 
 dft <- read_csv('notices_smooth_ts.csv')
 
