@@ -44,7 +44,7 @@ p1 <- ggplot(data = df, aes(x = disadv, y = count, fill = disadv)) +
   scale_fill_manual(
     name = "Tract + Project type",
     values = c("Disadvantaged" = "#F45D01", "Not Disadvantaged" = "#333C6B", "Industrial" = "#C5C5C5"),
-    labels = c("Not DA tract, non-industrial",  "Both, Industrial", "DA tract, non-industrial" )
+    labels = c("DA tract, non-industrial",  "Both, Industrial", "Not DA tract, non-industrial" )
   ) +
   labs(x = "Tract Status", y = "Total Projects") +
   theme_minimal() +
