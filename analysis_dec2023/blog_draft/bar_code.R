@@ -54,7 +54,7 @@ p1 <- ggplot(data = df, aes(x = disadv, y = count, fill = disadv)) +
     panel.grid.minor.x = element_blank(),
     panel.grid.major.y = element_line(color = "grey", linewidth = 0.1), # Keep horizontal gridlines; customize as needed
     
-    plot.title = element_text(face = "bold", size = 11, hjust = 0),
+    plot.title = element_text(face = "bold", size = 9, hjust = 0),
     plot.margin = margin(5.5, 40, 5.5, 5.5),
     # plot.background = element_rect(fill = "transparent",  colour = NA_character_),
     plot.background = element_rect(color = "black", fill = "transparent"), # Border around the entire plot
@@ -108,7 +108,7 @@ p2 <- ggplot(data = df, aes(x = disadv, y = count, fill = disadv)) +
     panel.grid.minor.x = element_blank(),
     panel.grid.major.y = element_line(color = "grey", linewidth = 0.1), # Keep horizontal gridlines; customize as needed
     
-    plot.title = element_text(face = "bold", size = 11, hjust = 0),
+    plot.title = element_text(face = "bold", size = 9, hjust = 0),
     plot.margin = margin(5.5, 40, 5.5, 5.5),
     # plot.background = element_rect(fill = "transparent",  colour = NA_character_),
     plot.background = element_rect(color = "black", fill = "transparent"), # Border around the entire plot
