@@ -65,13 +65,13 @@ class configuration:
         self.update = 1
         
         ## 2）How many days in the past you would like search for updated notices: numeric # from 0 to 500; default as 100
-        self.n_days = 14
+        self.n_days = 100
 
         ## 3) How many maximum notices (sorted by date) to download?
         self.max_notices = 20
         
         ## 4）which district you would like to scrape: "New Orleans", "Galveston", "Jacksonville", "Mobile", or "all"; default as "all"
-        self.district = "all"
+        self.district = "Mobile"
 
         ## 5) which table you would like to upload to Redivis?
         ## Any of tables in the list = ["main_df", "manager_df", "location_df", "character_df", "mitigation_df", "fulltext_df", "summary_df", "wetland_final_df", "embed_final_df", "validation_df", "aws_df", "geocoded_df"], "none" or "all"; defaul as "all"
@@ -96,7 +96,7 @@ class configuration:
         self.tesseract_path = None
         
         ## 12) Set GPT model
-        self.GPT_MODEL_SET = "gpt-3.5-turbo-0613"
+        self.GPT_MODEL_SET = "gpt-4o-mini"
 
 
 ###############################

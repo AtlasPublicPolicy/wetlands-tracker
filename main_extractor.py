@@ -159,7 +159,8 @@ def data_schema_preprocess(df_base, aws_client, GPT_MODEL): # redivis_dataset
     df['noticeID'] = 'Notice_NO_' + (df.index + noticeID_start_on).astype(str)
 
     #E D. Generate column of token counts
-    encoding = tiktoken.encoding_for_model(GPT_MODEL)
+    #encoding = tiktoken.encoding_for_model(GPT_MODEL)
+    encoding= tiktoken.get_encoding("cl100k_base")
     
     # Count the number of tokens
     df['tokens'] = df['pdf_character'].apply(lambda x: len(encoding.encode(x)))
@@ -194,6 +195,7 @@ def data_schema_summarization(df, price_cap, AZURE_ENDPOINT, AZURE_API_KEY, aws_
     # Subset df to a full text table
     fulltext_df = df[['noticeID' ,'pdf_full_text', 'pdf_trimmed']].copy()
     fulltext_df = fulltext_df[~(fulltext_df.pdf_full_text=="unknown")].copy()
+
 
     # Create rowID (Redivis ver)
     # fulltext_df_redivis = redivis_dataset.table("fulltext").to_pandas_dataframe(variables = ["rowID"], progress=False)

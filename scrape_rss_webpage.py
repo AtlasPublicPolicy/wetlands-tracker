@@ -444,6 +444,7 @@ def web_extraction(web_url, update):
     district = re.search(r'www\.(.*?)\.usace', web_url).group(1)
     
     req = requests.get(web_url)
+    print(f"Status code: {req.status_code}")
     content = req.text
     soup = BeautifulSoup(content, 'html.parser')
     
