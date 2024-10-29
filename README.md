@@ -2,6 +2,19 @@
 ### Overview
 The U.S. Army Corps of Engineers (USACE) evaluates permit applications for any work, including construction and dredging, in the Nation’s navigable waters. The Wetlands Impact Tracker compiles public notices of those permit applications from USACE, typically stored in PDFs. The data pulled from these notices can help users better understand the impact of development projects on sensitive areas by revealing and summarizing individual notices, and aggregating data. We encourage you to use this tool to explore and better understand how development projects are impacting the communities you work with and live in.
 
+### Data
+All data powering the dashboard is located on an AWS S3 bucket with public read access. Here are the links to the CSVs:
+* [aws_df.csv](https://usace-notices.s3.amazonaws.com/dashboard-data/aws_df.csv)
+* [character_df.csv](https://usace-notices.s3.amazonaws.com/dashboard-data/character_df.csv)
+* [fulltext_df.csv](https://usace-notices.s3.amazonaws.com/dashboard-data/fulltext_df.csv)
+* [geocoded_df.csv](https://usace-notices.s3.amazonaws.com/dashboard-data/geocoded_df.csv)
+* [location_df.csv](https://usace-notices.s3.amazonaws.com/dashboard-data/location_df.csv)
+* [main_df.csv](https://usace-notices.s3.amazonaws.com/dashboard-data/main_df.csv)
+* [manager_df.csv](https://usace-notices.s3.amazonaws.com/dashboard-data/manager_df.csv)
+* [mitigation_df.csv](https://usace-notices.s3.amazonaws.com/dashboard-data/mitigation_df.csv)
+* [wetland_final_df.csv](https://usace-notices.s3.amazonaws.com/dashboard-data/wetland_final_df.csv)
+* [summary_df.csv](https://usace-notices.s3.amazonaws.com/dashboard-data/summary_df.csv)
+
 ### Prerequisite and Installation
 * Install Python: If you don't have Python installed, download and install it from the official [Python website](https://www.python.org/downloads/).
 * Clone or Download the Repository:
@@ -82,18 +95,6 @@ __In an active virtual environment__
 * requirements.txt: Lists all Python dependencies required for running the project.
 * Other scripts:
 ![workflow](workflow.png)
-
-### Data
-All data powering the dashboard is located on an AWS S3 bucket with public read access. Here are the links to the CSVs:
-* [aws_df.csv](https://s3.console.aws.amazon.com/s3/object/usace-notices?region=us-east-1&bucketType=general&prefix=dashboard-data/aws_df.csv)
-* [character_df](https://s3.console.aws.amazon.com/s3/object/usace-notices?region=us-east-1&bucketType=general&prefix=dashboard-data/character_df.csv)
-* [fulltext_df.csv](https://s3.console.aws.amazon.com/s3/object/usace-notices?region=us-east-1&bucketType=general&prefix=dashboard-data/fulltext_df.csv)
-* [geocoded_df.csv](https://s3.console.aws.amazon.com/s3/object/usace-notices?region=us-east-1&bucketType=general&prefix=dashboard-data/geocoded_df.csv)
-* [location_df.csv](https://s3.console.aws.amazon.com/s3/object/usace-notices?region=us-east-1&bucketType=general&prefix=dashboard-data/location_df.csv)
-* [main_df.csv](https://s3.console.aws.amazon.com/s3/object/usace-notices?region=us-east-1&bucketType=general&prefix=dashboard-data/main_df.csv)
-* [manager_df.csv](https://s3.console.aws.amazon.com/s3/object/usace-notices?region=us-east-1&bucketType=general&prefix=dashboard-data/manager_df.csv)
-* [mitigation_df.csv](https://s3.console.aws.amazon.com/s3/object/usace-notices?region=us-east-1&bucketType=general&prefix=dashboard-data/mitigation_df.csv)
-* [summary_df.csv](https://s3.console.aws.amazon.com/s3/object/usace-notices?region=us-east-1&bucketType=general&prefix=dashboard-data/summary_df.csv)
 
 ### Troubleshooting
 * __log.txt__: You can find messages, warnings, and errors here.
