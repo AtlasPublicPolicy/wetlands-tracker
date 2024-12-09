@@ -261,7 +261,8 @@ def data_schema_summarization(df, price_cap, AZURE_ENDPOINT, AZURE_API_KEY, aws_
     
     # Clean special characters in the fulltext_df (do no remove special character before summarization to avoid generating misleading info)
     fulltext_df = clean_special_characters(fulltext_df, ['pdf_full_text', 'pdf_trimmed'])
-    
+    summary_df['short_summary'] = summary_df['short_summary'].str.replace('\\n', '', regex=True)
+
     return {"fulltext_df": fulltext_df,
             "summary_df": summary_df}
 
