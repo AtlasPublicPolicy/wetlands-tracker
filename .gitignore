@@ -5,8 +5,14 @@
 !workflow.png
 *.sh
 
+#
+
 #redivis upload csvs
 *.csv
+
+
+# no PDFs
+*.pdf
 
 # config files
 *.ini
