@@ -1,0 +1,9 @@
+aiohttp==3.11.11
+boto3==1.37.31
+nest_asyncio==1.6.0
+pandas==2.2.3
+Requests==2.32.3
+selenium==4.31.0
+SQLAlchemy==2.0.32
+tqdm==4.66.4
+webdriver_manager==4.0.2
